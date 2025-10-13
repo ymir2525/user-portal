@@ -1,0 +1,22 @@
+@import "tailwindcss";
+html, body, #root { height: 100%; }
+/* src/index.css (or your global stylesheet) */
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+
+  /* hide everything except the print sheet */
+  .print\:only { display: none !important; }
+  .only\:print { display: block !important; }
+
+  /* keep colors */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* default: hide the print sheet on screen */
+.only\:print { display: none; }
+
+/* a couple small utilities used by the Rx sheet */
+.rx-border { border: 2px solid #f28c2c; } /* orange frame */
+.rx-accent { color: #f28c2c; }            /* orange text */
+.rx-line { border-bottom: 1px solid #bbb; height: 18px; }
+.rx-small { font-size: 11px; }
