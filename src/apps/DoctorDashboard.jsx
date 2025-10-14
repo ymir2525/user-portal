@@ -14,6 +14,34 @@ import MedCertForm from "../components/MedCertForm";
 import LabRequestForm from "../components/LabRequestForm";
 import PrescriptionForm from "../components/PrescriptionForm";
 
+// ---- helpers to compute display values ----
+function ageDisplayFromBirthdate(birthdate, fallbackAge) {
+  if (!birthdate) return (fallbackAge ?? "") === "" ? "—" : String(fallbackAge);
+
+  const bd = new Date(birthdate);
+  if (isNaN(bd)) return (fallbackAge ?? "") === "" ? "—" : String(fallbackAge);
+
+  const now = new Date();
+  if (bd > now) return "0 months";
+
+  let months = (now.getFullYear() - bd.getFullYear()) * 12 + (now.getMonth() - bd.getMonth());
+  if (now.getDate() < bd.getDate()) months -= 1;
+  months = Math.max(0, months);
+
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"}`;
+
+  const years = Math.floor(months / 12);
+  return `${years}`;
+}
+
+function sexDisplay(sex) {
+  if (!sex) return "—";
+  const s = String(sex).toUpperCase();
+  if (s === "MEN") return "MALE";
+  if (s === "WOMEN") return "FEMALE";
+  return s; // OTHER or already MALE/FEMALE
+}
+
 export default function DoctorDashboard() {
   const nav = useNavigate();
 
@@ -77,61 +105,56 @@ export default function DoctorDashboard() {
 
     async function fetchQueue() {
       try {
-        // records that are queued (by status or queued flag)
-       const { data, error } = await supabase
-  .from("patient_records")
-  .select(`
-    id,
-    patient_id,
-    created_at,
-    visit_date,
-    chief_complaint,
-    height_cm,
-    weight_kg,
-    blood_pressure,
-    temperature_c,
-    status,
-    queued,
-    patients:patient_id (
-      id,
-      first_name,
-      middle_name,
-      surname,
-      family_number,
-      sex,
-      age,
-      birthdate,
-      contact_number,
-      contact_person
-    )
-  `)
-  .or("status.eq.queued,queued.eq.true")
-  .order("created_at", { ascending: true });
+        const { data, error } = await supabase
+          .from("patient_records")
+          .select(`
+            id,
+            patient_id,
+            created_at,
+            visit_date,
+            chief_complaint,
+            height_cm,
+            weight_kg,
+            blood_pressure,
+            temperature_c,
+            status,
+            queued,
+            patients:patient_id (
+              id,
+              first_name,
+              middle_name,
+              surname,
+              family_number,
+              sex,
+              age,
+              birthdate,
+              contact_number,
+              contact_person
+            )
+          `)
+          .or("status.eq.queued,queued.eq.true")
+          .order("created_at", { ascending: true });
 
-if (error) throw error;
+        if (error) throw error;
 
-const list = (data || []).map((r) => ({
-  record_id: r.id,
-  patient_id: r.patient_id,
-  family_number: r.patients?.family_number ?? "",
-  first_name: r.patients?.first_name ?? "",
-  middle_name: r.patients?.middle_name ?? "",
-  surname: r.patients?.surname ?? "",
-  sex: r.patients?.sex ?? "",
-  age: r.patients?.age ?? "",
-  birthdate: r.patients?.birthdate ?? null,
-
-  // contact fields
-  contact_number: r.patients?.contact_number ?? "",
-  contact_person: r.patients?.contact_person ?? "",
-
-  // nurse vitals
-  height_cm: r.height_cm,
-  weight_kg: r.weight_kg,
-  blood_pressure: r.blood_pressure,
-  temperature_c: r.temperature_c,
-  chief_complaint: r.chief_complaint,
-}));
+        const list = (data || []).map((r) => ({
+          record_id: r.id,
+          patient_id: r.patient_id,
+          family_number: r.patients?.family_number ?? "",
+          first_name: r.patients?.first_name ?? "",
+          middle_name: r.patients?.middle_name ?? "",
+          surname: r.patients?.surname ?? "",
+          sex: r.patients?.sex ?? "",
+          age: r.patients?.age ?? "",
+          birthdate: r.patients?.birthdate ?? null,
+          contact_number: r.patients?.contact_number ?? "",
+          contact_person: r.patients?.contact_person ?? "",
+          height_cm: r.height_cm,
+          weight_kg: r.weight_kg,
+          blood_pressure: r.blood_pressure,
+          temperature_c: r.temperature_c,
+          chief_complaint: r.chief_complaint,
+        }));
 
         if (!equalQueues(list, prevQueueRef.current)) {
           prevQueueRef.current = list;
@@ -208,7 +231,6 @@ const list = (data || []).map((r) => ({
     }
   };
 
-  // confirm + save (your existing handler)
   const handleSaveClick = () => {
     if (!docNotes || !docNotes.trim()) {
       alert("Please enter the Doctor’s Notes before saving.");
@@ -235,7 +257,7 @@ const list = (data || []).map((r) => ({
         .from("patient_records")
         .select("*")
         .eq("patient_id", active.patient_id)
-        .neq("status", "queued") // exclude ones still queued
+        .neq("status", "queued")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -250,24 +272,21 @@ const list = (data || []).map((r) => ({
 
   useEffect(() => {
     if (tab === "past" && active?.patient_id) void loadPastRecords();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, active?.patient_id]);
+  }, [tab, active?.patient_id]); // eslint-disable-line
 
-  // ---- RECORD DOCUMENTS (referral/prescription/lab/medcert) ----
   async function saveRecordDocument(recordId, type, payload, filename, url) {
     const { error } = await supabase
       .from("record_documents")
       .insert({
         record_id: recordId,
-        type,                  // 'referral' | 'prescription' | 'lab' | 'medcert'
+        type,
         payload: payload ?? {},
         filename: filename || null,
-        url: url || null,      // if you upload to Storage, save the public URL here
+        url: url || null,
       });
     if (error) throw error;
   }
 
-  // simple filename makers
   const makeName = (p, prefix, dateStr) => {
     const clean = (s) => String(s || "").trim().replace(/\s+/g, "_").replace(/[^A-Za-z0-9_.-]/g, "");
     const name = clean(fullName(p)) || "patient";
@@ -279,6 +298,15 @@ const list = (data || []).map((r) => ({
   const makePrescriptionFilename = (p, d) => makeName(p, "PRESCRIPTION", d);
   const makeLabReqFilename = (p, d) => makeName(p, "LABREQ", d);
   const makeMedCertFilename = (p, d) => makeName(p, "MEDCERT", d);
+
+  // ---- compute display fields for the active patient ----
+  const activeWithDisplays = active
+    ? {
+        ...active,
+        age_display: ageDisplayFromBirthdate(active.birthdate, active.age),
+        sex_display: sexDisplay(active.sex),
+      }
+    : null;
 
   return (
     <div className="min-h-screen flex">
@@ -340,7 +368,7 @@ const list = (data || []).map((r) => ({
 
             {active && docView === "none" && (
               <div className="space-y-4">
-                <PatientHeader patient={active} />
+                <PatientHeader patient={activeWithDisplays} />
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="border rounded p-3 bg-white">
                     <div className="font-semibold mb-2">Doctor’s Notes:</div>
@@ -491,8 +519,6 @@ const list = (data || []).map((r) => ({
               <PastDocumentsView
                 rec={selectedPast}
                 onBack={() => setPastView("detail")}
-                // NOTE: Update PastDocumentsView to use Supabase:
-                // supabase.from('record_documents').select('*').eq('record_id', rec.id)
               />
             )}
           </div>

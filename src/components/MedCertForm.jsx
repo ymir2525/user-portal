@@ -1,6 +1,7 @@
 // src/components/MedCertForm.jsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import SignatureDialog from "./signaturePad/SignatureDialog"; // ← NEW
 
 export default function MedCertForm({ active, onBack, onSavePdf }) {
   const today = () => {
@@ -13,7 +14,32 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
   const patientName = () =>
     [active?.first_name, active?.middle_name, active?.surname].filter(Boolean).join(" ");
 
-  // Prefill from Supabase auth/profile (no global `session` var)
+  /* -------------------- helpers (month rule + sex normalize) -------------------- */
+  function ageDisplayFromBirthdate(birthdate, fallbackAge) {
+    if (!birthdate) return (fallbackAge ?? "") === "" ? "" : String(fallbackAge);
+    const bd = new Date(birthdate);
+    if (isNaN(bd)) return (fallbackAge ?? "") === "" ? "" : String(fallbackAge);
+
+    const now = new Date();
+    let months =
+      (now.getFullYear() - bd.getFullYear()) * 12 + (now.getMonth() - bd.getMonth());
+    if (now.getDate() < bd.getDate()) months -= 1;
+    months = Math.max(0, months);
+
+    if (months < 12) return `${months} month${months === 1 ? "" : "s"}`;
+    const years = Math.floor(months / 12);
+    return `${years}`;
+  }
+
+  function sexDisplay(sex) {
+    if (!sex) return "";
+    const s = String(sex).toUpperCase();
+    if (s === "MEN") return "MALE";
+    if (s === "WOMEN") return "FEMALE";
+    return s;
+  }
+
+  // Prefill from Supabase auth/profile
   const [prefillDocName, setPrefillDocName] = useState("");
   useEffect(() => {
     let mounted = true;
@@ -43,8 +69,8 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
   const [form, setForm] = useState({
     date: today(),
     name: patientName(),
-    age: active?.age ?? "",
-    sex: active?.sex ?? "",
+    age: ageDisplayFromBirthdate(active?.birthdate, active?.age),
+    sex: sexDisplay(active?.sex),
     address: "",
     consultVerb: "was examined",
     consultedOn: "",
@@ -53,7 +79,11 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
     recommendation: "",
     doctorName: "", // set after we fetch profile
     licenseNo: "",
+    doctorSignaturePng: "", // ← NEW: drawn signature
   });
+
+  // modal state (NEW)
+  const [sigOpen, setSigOpen] = useState(false);
 
   // refresh patient basics when switching queue rows
   useEffect(() => {
@@ -61,11 +91,11 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
       ...s,
       date: s.date || today(),
       name: patientName() || s.name,
-      age: active?.age ?? s.age ?? "",
-      sex: active?.sex ?? s.sex ?? "",
+      age: ageDisplayFromBirthdate(active?.birthdate, active?.age) || s.age || "",
+      sex: sexDisplay(active?.sex) || s.sex || "",
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active?.record_id]);
+  }, [active?.record_id, active?.birthdate, active?.age, active?.sex]);
 
   // apply doctor prefill once it arrives (don’t overwrite if user already typed)
   useEffect(() => {
@@ -76,6 +106,37 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
 
   const set = (k, v) => setForm((s) => ({ ...s, [k]: v }));
   const v = (x) => (x && String(x).trim()) || "";
+
+  /* ------------------------ Required fields validation ------------------------ */
+  const validateBeforeSave = () => {
+    const missing = [];
+    if (!v(form.date)) missing.push("Date");
+    if (!v(form.name)) missing.push("Patient Name");
+    if (!v(form.age)) missing.push("Age");
+    if (!v(form.sex)) missing.push("Sex");
+    if (!v(form.consultedOn)) missing.push("Consulted/Examined/Treated/Confined on (date)");
+    if (!v(form.reasonFor)) missing.push("For (reason/diagnosis)");
+    if (!v(form.assessment)) missing.push("Assessment/Impression");
+    if (!v(form.recommendation)) missing.push("Recommendation/s");
+    if (!v(form.doctorName)) missing.push("Physician Name");
+    if (!v(form.licenseNo)) missing.push("License No.");
+    // If you want the drawn signature mandatory, uncomment:
+    // if (!v(form.doctorSignaturePng)) missing.push("Physician Signature (drawn)");
+
+    if (missing.length) {
+      alert(
+        "Please complete the following before saving as PDF:\n\n• " +
+          missing.join("\n• ")
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const handleSaveClick = () => {
+    if (!validateBeforeSave()) return;
+    onSavePdf(form); // includes doctorSignaturePng now
+  };
 
   return (
     <div className="bg-white border rounded p-4 print:p-0">
@@ -90,7 +151,7 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
             Back
           </button>
           <button
-            onClick={() => onSavePdf(form)}
+            onClick={handleSaveClick}
             className="px-3 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-sm"
           >
             Save as PDF
@@ -198,7 +259,40 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
                 value={form.doctorName}
                 onChange={(e) => set("doctorName", e.target.value)}
               />
+              {/* --- Signature capture lives directly under Physician Name --- */}
+              <div className="mt-2">
+                <div className="text-xs text-slate-600 mb-1">
+                  Capture physician’s handwritten signature (prints above the name)
+                </div>
+                <div className="flex items-start gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setSigOpen(true)}
+                    className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                  >
+                    {form.doctorSignaturePng ? "Retake Signature" : "Capture Signature"}
+                  </button>
+
+                  {form.doctorSignaturePng && (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={form.doctorSignaturePng}
+                        alt="Physician Signature"
+                        className="max-h-20 border rounded bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => set("doctorSignaturePng", "")}
+                        className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </L>
+
             <L label="License No.">
               <input
                 className="w-full border rounded px-3 py-2"
@@ -254,6 +348,16 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
             </div>
 
             <div className="mc-sign">
+              {/* NEW: render signature image above the printed name if present */}
+              {v(form.doctorSignaturePng) ? (
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
+                  <img
+                    src={form.doctorSignaturePng}
+                    alt="Physician Signature"
+                    style={{ maxHeight: "80px", maxWidth: "70%", objectFit: "contain" }}
+                  />
+                </div>
+              ) : null}
               <div className="sig-name">{v(form.doctorName) || "\u00A0"}</div>
               <div className="sig-caption">
                 License No. <span className="line xs">{v(form.licenseNo)}</span>
@@ -284,7 +388,6 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
         .mc-par.small { font-size: 11.5px; }
         .label { font-weight: 700; margin: 6px 0 4px; }
 
-        /* Multiline ruled blocks that display text */
         .multiline {
           min-height: 46px;
           padding: 6px 2px 10px;
@@ -320,6 +423,16 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
           .print-only { display: block !important; }
         }
       `}</style>
+
+      {/* Signature modal */}
+      <SignatureDialog
+        open={sigOpen}
+        onClose={() => setSigOpen(false)}
+        initialValue={form.doctorSignaturePng}
+        onDone={(png) => set("doctorSignaturePng", png)}
+        title="Physician Signature"
+        heightClass="h-56"
+      />
     </div>
   );
 }

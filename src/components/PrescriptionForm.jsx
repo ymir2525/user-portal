@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtDate, fullName } from "../lib/utils";
 import { supabase } from "../lib/supabase";
+import SignatureDialog from "./signaturePad/SignatureDialog"; // ← NEW
 
 export default function PrescriptionForm({ active, onBack, onSavePdf }) {
   const nav = useNavigate();
@@ -44,6 +45,35 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
   const [licenseNo, setLicenseNo] = useState("");
   const [items, setItems] = useState([{ med_id: null, name: "", sig: "", qty: "" }]);
 
+  // --- Signature (NEW) ---
+  const [doctorSignaturePng, setDoctorSignaturePng] = useState("");
+  const [sigOpen, setSigOpen] = useState(false);
+
+  // ---------------- Month-rule + sex helpers ----------------
+  const ageDisplayFromBirthdate = (birthdate, fallbackAge) => {
+    if (!birthdate) return (fallbackAge ?? "") === "" ? "" : String(fallbackAge);
+    const bd = new Date(birthdate);
+    if (isNaN(bd)) return (fallbackAge ?? "") === "" ? "" : String(fallbackAge);
+
+    const now = new Date();
+    let months =
+      (now.getFullYear() - bd.getFullYear()) * 12 + (now.getMonth() - bd.getMonth());
+    if (now.getDate() < bd.getDate()) months -= 1;
+    months = Math.max(0, months);
+
+    if (months < 12) return `${months} month${months === 1 ? "" : "s"}`;
+    const years = Math.floor(months / 12);
+    return `${years}`;
+  };
+
+  const sexDisplay = (sex) => {
+    if (!sex) return "";
+    const s = String(sex).toUpperCase();
+    if (s === "MEN") return "MALE";
+    if (s === "WOMEN") return "FEMALE";
+    return s;
+  };
+
   // Build dropdown options (use string values for <select>)
   const medOptions = useMemo(
     () =>
@@ -62,36 +92,74 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
   const addRow = () => setItems((l) => [...l, { med_id: null, name: "", sig: "", qty: "" }]);
   const removeRow = (i) => setItems((l) => l.filter((_, idx) => idx !== i));
 
-  const computeAge = () => {
-    if (active?.age) return active.age;
-    const bd = active?.birthdate ? new Date(active.birthdate) : null;
-    if (!bd || isNaN(bd)) return "";
-    const t = new Date();
-    let a = t.getFullYear() - bd.getFullYear();
-    const m = t.getMonth() - bd.getMonth();
-    if (m < 0 || (m === 0 && t.getDate() < bd.getDate())) a--;
-    return a;
-  };
+  // Month rule applied here
+  const computeAge = () => ageDisplayFromBirthdate(active?.birthdate, active?.age);
 
   const payload = {
     patient: {
       id: active?.patient_id,
       name: fullName(active),
-      sex: active?.sex || "",
+      sex: sexDisplay(active?.sex) || "",
       age: computeAge() || "",
     },
     date,
     doctor_name: doctorName,
     license_no: licenseNo,
+    signature_png: doctorSignaturePng || "", // ← NEW: include in payload sent to onSavePdf
     items: items
       .filter((r) => r.med_id || r.name || r.sig || r.qty)
       .map((r) => ({ med_id: r.med_id, name: r.name, sig: r.sig, qty: r.qty })),
   };
 
+  // -------- Validation before saving/printing --------
+  const validateBeforeSave = () => {
+    const missing = [];
+
+    if (!String(date).trim()) missing.push("Date");
+    if (!String(doctorName).trim()) missing.push("Physician");
+    if (!String(licenseNo).trim()) missing.push("License No.");
+    // If you want the drawn signature to be mandatory, uncomment:
+    // if (!doctorSignaturePng) missing.push("Physician Signature");
+
+    // at least one medicine with name + qty + sig
+    const cleaned = items
+      .map((r) => ({
+        name: String(r.name || "").trim(),
+        qty: String(r.qty || "").trim(),
+        sig: String(r.sig || "").trim(),
+      }))
+      .filter((r) => r.name || r.qty || r.sig);
+
+    if (cleaned.length === 0) {
+      missing.push("At least one medicine row (Name, Directions, Quantity)");
+    } else {
+      const badRows = [];
+      cleaned.forEach((r, idx) => {
+        const problems = [];
+        if (!r.name) problems.push("Name");
+        if (!r.sig) problems.push("Directions");
+        if (!r.qty) problems.push("Quantity");
+        else if (!/^\d+$/.test(r.qty) || Number(r.qty) <= 0) problems.push("Quantity must be a positive number");
+        if (problems.length) badRows.push(`Row ${idx + 1}: ${problems.join(", ")}`);
+      });
+      if (badRows.length) missing.push(...badRows);
+    }
+
+    if (missing.length) {
+      alert(
+        "Please complete the following before saving as PDF:\n\n• " +
+          missing.join("\n• ")
+      );
+      return false;
+    }
+    return true;
+  };
+
   const submit = (e) => {
     e.preventDefault();
+    if (!validateBeforeSave()) return;
     onSavePdf(payload);
-    window.print();
+    window.print(); // we isolate printing to the sheet via @media print rules below
   };
 
   return (
@@ -134,7 +202,7 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
                   <input className="w-full h-10 border rounded px-3 bg-gray-50" readOnly value={fullName(active)} />
                 </Field>
                 <Field label="Sex">
-                  <input className="w-full h-10 border rounded px-3 bg-gray-50" readOnly value={active?.sex || ""} />
+                  <input className="w-full h-10 border rounded px-3 bg-gray-50" readOnly value={sexDisplay(active?.sex) || ""} />
                 </Field>
                 <Field label="Age">
                   <input className="w-full h-10 border rounded px-3 bg-gray-50" readOnly value={computeAge() || ""} />
@@ -152,6 +220,39 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
                 <Field label="License No." required>
                   <input className="w-full h-10 border rounded px-3" value={licenseNo} onChange={(e) => setLicenseNo(e.target.value)} required />
                 </Field>
+              </section>
+
+              {/* Signature capture (NEW) */}
+              <section className="text-sm">
+                <div className="flex items-start gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setSigOpen(true)}
+                    className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                  >
+                    {doctorSignaturePng ? "Retake Signature" : "Capture Signature"}
+                  </button>
+
+                  {doctorSignaturePng && (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={doctorSignaturePng}
+                        alt="Physician Signature"
+                        className="max-h-20 border rounded bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDoctorSignaturePng("")}
+                        className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Signature will print above the “Signature” line.
+                </div>
               </section>
 
               {/* Medicines section */}
@@ -234,7 +335,28 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
       </div>
 
       {/* ---------- PRINT SHEET (shown only on print/PDF) ---------- */}
-      <RxPrintSheet payload={payload} />
+      <div id="rx-print">
+        <RxPrintSheet payload={payload} />
+      </div>
+
+      {/* Print isolation so only #rx-print renders */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #rx-print, #rx-print * { visibility: visible !important; }
+          #rx-print { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+      `}</style>
+
+      {/* Reusable Signature Dialog */}
+      <SignatureDialog
+        open={sigOpen}
+        onClose={() => setSigOpen(false)}
+        initialValue={doctorSignaturePng}
+        onDone={(png) => setDoctorSignaturePng(png)}
+        title="Physician Signature"
+        heightClass="h-56"
+      />
     </div>
   );
 }
@@ -263,7 +385,7 @@ function LabeledLine({ label, value, className = "" }) {
   );
 }
 
-/* Print/PDF sheet (unchanged styling) */
+/* Print/PDF sheet */
 function RxPrintSheet({ payload }) {
   const p = payload || {};
   const items = p.items || [];
@@ -313,6 +435,16 @@ function RxPrintSheet({ payload }) {
           <div className="col-span-7" />
           <div className="col-span-5 text-right">
             <div className="mb-6">
+              {/* Signature image if available; else show the plain line */}
+              {p.signature_png ? (
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
+                  <img
+                    src={p.signature_png}
+                    alt="Physician Signature"
+                    style={{ maxHeight: "80px", maxWidth: "70%", objectFit: "contain" }}
+                  />
+                </div>
+              ) : null}
               <div className="border-b border-gray-400 h-[18px]" />
               <div className="mt-1">Signature</div>
             </div>

@@ -15,25 +15,24 @@ export default function BhwDashboard() {
 
   // Role guard via Supabase Auth + profiles
   useEffect(() => {
-  let mounted = true;
-  (async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const session = sessionData?.session;
-    if (!session?.user?.id) { nav("/login", { replace: true }); return; }
+    let mounted = true;
+    (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData?.session;
+      if (!session?.user?.id) { nav("/login", { replace: true }); return; }
 
-    const { data: prof, error } = await supabase
-      .from("profiles").select("role").eq("id", session.user.id).single();
+      const { data: prof, error } = await supabase
+        .from("profiles").select("role").eq("id", session.user.id).single();
 
-    if (!mounted) return;
-    if (error || !prof || String(prof.role).toUpperCase() !== "BHW") {
-      await supabase.auth.signOut().catch(()=>{});
-      nav("/login", { replace: true }); return;
-    }
-    setLoadingRole(false);
-  })();
-  return () => { mounted = false; };
-}, [nav]);
-
+      if (!mounted) return;
+      if (error || !prof || String(prof.role).toUpperCase() !== "BHW") {
+        await supabase.auth.signOut().catch(()=>{});
+        nav("/login", { replace: true }); return;
+      }
+      setLoadingRole(false);
+    })();
+    return () => { mounted = false; };
+  }, [nav]);
 
   const logout = async () => {
     await supabase.auth.signOut().catch(() => {});
@@ -89,6 +88,50 @@ function PatientRegistration() {
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState(null); // {type:'success'|'error', msg:string}
 
+  // Cap date inputs to today
+  const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  // Live error for Birthdate (future/invalid)
+  const birthdateError = useMemo(() => {
+    if (!form.birthdate) return "";
+    const bd = new Date(form.birthdate);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    if (isNaN(bd.getTime())) return "Birthdate is invalid.";
+    if (bd > today) return "Birthdate cannot be in the future.";
+    return "";
+  }, [form.birthdate]);
+
+  // Infant months + derived years from birthdate
+  const { infantMonths, isInfant, birthdateYears } = useMemo(() => {
+    if (!form.birthdate) return { infantMonths: 0, isInfant: false, birthdateYears: null };
+    const bd = new Date(form.birthdate);
+    if (isNaN(bd)) return { infantMonths: 0, isInfant: false, birthdateYears: null };
+    const t = new Date();
+
+    // years
+    let years = t.getFullYear() - bd.getFullYear();
+    const mDelta = t.getMonth() - bd.getMonth();
+    if (mDelta < 0 || (mDelta === 0 && t.getDate() < bd.getDate())) years--;
+
+    // months
+    let months = (t.getFullYear() - bd.getFullYear()) * 12 + (t.getMonth() - bd.getMonth());
+    if (t.getDate() < bd.getDate()) months--;
+    months = Math.max(0, months);
+
+    return { infantMonths: months, isInfant: months < 12, birthdateYears: Math.max(0, years) };
+  }, [form.birthdate]);
+
+  // Live error for typed Age
+  const ageError = useMemo(() => {
+    if (form.age === "" || form.age === null || form.age === undefined) return "";
+    const n = Number(form.age);
+    if (!Number.isFinite(n)) return "Age must be a number.";
+    if (n < 0) return "Age cannot be negative.";
+    if (n > 120) return "Age must not exceed 120.";
+    return "";
+  }, [form.age]);
+
   // Family→surname lock state
   const [famLockSurname, setFamLockSurname] = useState(null); // string | null
   const [famLookupLoading, setFamLookupLoading] = useState(false);
@@ -104,6 +147,19 @@ function PatientRegistration() {
     if (!form.sex) return "Sex is required.";
     if (!form.birthdate) return "Birthdate is required.";
     if (!form.age) return "Age is required.";
+
+    // Block future birthdates
+    const bd = new Date(form.birthdate);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    if (isNaN(bd.getTime())) return "Birthdate is invalid.";
+    if (bd > today) return "Birthdate cannot be in the future.";
+
+    // Age typed must not exceed 120
+    if (Number(form.age) > 120) return "Age must not exceed 120.";
+
+    // Birthdate-derived years must not exceed 120
+    if (birthdateYears !== null && birthdateYears > 120) return "Birthdate implies age over 120.";
 
     if (famLockSurname && norm(form.surname) !== norm(famLockSurname)) {
       return `Family Number is already assigned to surname "${famLockSurname}". Please use that surname or choose a different Family Number.`;
@@ -122,115 +178,120 @@ function PatientRegistration() {
     return null;
   };
 
-  const canSubmit = useMemo(() => !validate(), [form, famLockSurname]);
+  const canSubmit = useMemo(() => !validate(), [form, famLockSurname, birthdateYears]);
 
   const handleSubmitClick = async (e) => {
-  e.preventDefault();
-  if (saving) return;
+    e.preventDefault();
+    if (saving) return;
 
-  const err = validate();
-  if (err) { alert(err); return; }
+    const err = validate();
+    if (err) { alert(err); return; }
 
-  const ok = window.confirm(
-    "Finalize this registration? Make sure all required fields are complete. Click OK to submit or Cancel to review."
-  );
-  if (!ok) return;
+    const ok = window.confirm(
+      "Finalize this registration? Make sure all required fields are complete. Click OK to submit or Cancel to review."
+    );
+    if (!ok) return;
 
-  await submit();
-};
+    await submit();
+  };
 
-// Insert into public.patients (RLS + trigger will set created_by)
-const submit = async () => {
-  if (saving) return;
-  const err = validate();
-  if (err) { setNote({ type:"error", msg: err }); return; }
+  // Insert into public.patients (RLS + trigger will set created_by)
+  const submit = async () => {
+    if (saving) return;
+    const err = validate();
+    if (err) { setNote({ type:"error", msg: err }); return; }
 
-  setSaving(true);
-  setNote(null);
+    setSaving(true);
+    setNote(null);
 
-  try {
-    const payload = {
-      family_number: form.familyNumber.trim(),
-      surname: form.surname.trim(),
-      first_name: form.firstName.trim(),
-      middle_name: form.middleName.trim() || null,
-      sex: form.sex, // MEN/WOMEN/OTHER (matches CHECK)
-      birthdate: form.birthdate || null,
-      age: form.age ? Number(form.age) : null,
-      contact_number: form.contactNumber.trim() || null,
-      contact_person: form.contactPerson.trim() || null,
-      height_cm: form.heightCm ? Number(form.heightCm) : null,
-      weight_kg: form.weightKg ? Number(form.weightKg) : null,
-      blood_pressure: form.bloodPressure.trim() || null,
-      temperature_c: form.temperatureC ? Number(form.temperatureC) : null,
-      chief_complaint: form.chiefComplaint.trim() || null,
-    };
+    try {
+      // Map UI select (MALE/FEMALE/OTHER) to DB check (MEN/WOMEN/OTHER)
+      const sexForDb =
+        form.sex === "MALE" ? "MEN" :
+        form.sex === "FEMALE" ? "WOMEN" :
+        form.sex; // OTHER stays OTHER
 
-    const { data, error } = await supabase
-      .from("patients")
-      .insert(payload)
-      .select()
-      .single();
+      const payload = {
+        family_number: form.familyNumber.trim(),
+        surname: form.surname.trim(),
+        first_name: form.firstName.trim(),
+        middle_name: form.middleName.trim() || null,
+        sex: sexForDb, // matches CHECK constraint: MEN/WOMEN/OTHER
+        birthdate: form.birthdate || null,
+        age: form.age ? Number(form.age) : null,
+        contact_number: form.contactNumber.trim() || null,
+        contact_person: form.contactPerson.trim() || null,
+        height_cm: form.heightCm ? Number(form.heightCm) : null,
+        weight_kg: form.weightKg ? Number(form.weightKg) : null,
+        blood_pressure: form.bloodPressure.trim() || null,
+        temperature_c: form.temperatureC ? Number(form.temperatureC) : null,
+        chief_complaint: form.chiefComplaint.trim() || null,
+      };
 
-    if (error) throw error;
+      const { data, error } = await supabase
+        .from("patients")
+        .insert(payload)
+        .select()
+        .single();
 
-    // If the checkbox is checked, add a queued record immediately
-    if (form.proceedToQueue && data?.id) {
-      // Optional: prevent duplicates — only one queued record per patient
-      const { data: existing, error: existErr } = await supabase
-        .from("patient_records")
-        .select("id,status")
-        .eq("patient_id", data.id)
-        .eq("status", "queued")
-        .maybeSingle(); // null when none
+      if (error) throw error;
 
-      if (existErr) throw existErr;
-
-      if (!existing) {
-        const { error: recErr } = await supabase
+      // If the checkbox is checked, add a queued record immediately
+      if (form.proceedToQueue && data?.id) {
+        // Optional: prevent duplicates — only one queued record per patient
+        const { data: existing, error: existErr } = await supabase
           .from("patient_records")
-          .insert({
-            patient_id: data.id,
-            // visit_date omitted -> uses DEFAULT CURRENT_DATE
-            height_cm: payload.height_cm,
-            weight_kg: payload.weight_kg,
-            blood_pressure: payload.blood_pressure,
-            temperature_c: payload.temperature_c,
-            chief_complaint: payload.chief_complaint,
-            queued: true,        // keep if you want the boolean mirror
-            status: "queued",    // lowercase matches schema default
-          });
+          .select("id,status")
+          .eq("patient_id", data.id)
+          .eq("status", "queued")
+          .maybeSingle(); // null when none
 
-        if (recErr) {
-          console.error("patient_records insert error", {
-            code: recErr.code,
-            message: recErr.message,
-            details: recErr.details,
-            hint: recErr.hint,
-          });
-          throw recErr;
+        if (existErr) throw existErr;
+
+        if (!existing) {
+          const { error: recErr } = await supabase
+            .from("patient_records")
+            .insert({
+              patient_id: data.id,
+              // visit_date omitted -> uses DEFAULT CURRENT_DATE
+              height_cm: payload.height_cm,
+              weight_kg: payload.weight_kg,
+              blood_pressure: payload.blood_pressure,
+              temperature_c: payload.temperature_c,
+              chief_complaint: payload.chief_complaint,
+              queued: true,
+              status: "queued",
+            });
+
+          if (recErr) {
+            console.error("patient_records insert error", {
+              code: recErr.code,
+              message: recErr.message,
+              details: recErr.details,
+              hint: recErr.hint,
+            });
+            throw recErr;
+          }
         }
       }
+
+      setNote({ type:"success", msg:"Patient saved successfully." });
+      clearForm();
+      setFamLockSurname(null);
+    } catch (err) {
+      console.error("submit error", {
+        code: err?.code,
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint,
+      });
+      setNote({ type:"error", msg: err?.message || "Insert failed." });
+    } finally {
+      setSaving(false);
     }
+  };
 
-    setNote({ type:"success", msg:"Patient saved successfully." });
-    clearForm();
-    setFamLockSurname(null);
-  } catch (err) {
-    console.error("submit error", {
-      code: err?.code,
-      message: err?.message,
-      details: err?.details,
-      hint: err?.hint,
-    });
-    setNote({ type:"error", msg: err?.message || "Insert failed." });
-  } finally {
-    setSaving(false);
-  }
-};
-
-
-  // Auto-age from birthdate
+  // Auto-age from birthdate (in whole years)
   useEffect(() => {
     if (!form.birthdate) return;
     const b = new Date(form.birthdate);
@@ -278,8 +339,7 @@ const submit = async () => {
     }, 350);
 
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.familyNumber]);
+  }, [form.familyNumber]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <section className="max-w-5xl mx-auto">
@@ -298,11 +358,11 @@ const submit = async () => {
             />
             {famLockSurname && (
               <div className="text-xs text-orange-700 mt-1">
-                This Family Number is linked to <span className="font-semibold">“{famLockSurname}”</span>. Surname is locked.
+                This Family Number is linked to <span className="font-semibold">"{famLockSurname}"</span>. Surname is locked.
               </div>
             )}
             {!famLockSurname && famLookupLoading && (
-              <div className="text-xs text-gray-500 mt-1">Checking family mapping…</div>
+              <div className="text-xs text-gray-500 mt-1">Checking family mapping...</div>
             )}
           </div>
         </Row>
@@ -312,13 +372,38 @@ const submit = async () => {
           <Field label="Middle Name" value={form.middleName} setValue={v=>set("middleName",v)} />
         </Row>
         <Row two>
-          <Select label="Sex" value={form.sex} onChange={v=>set("sex",v)} options={["MEN","WOMEN","OTHER"]} required />
-          <Field label="Birthdate" type="date" value={form.birthdate} setValue={v=>set("birthdate",v)} required />
+          <Select label="Sex" value={form.sex} onChange={v=>set("sex",v)} options={["MALE","FEMALE","OTHER"]} required />
+          <Field
+            label="Birthdate"
+            type="date"
+            value={form.birthdate}
+            setValue={v=>set("birthdate",v)}
+            required
+            max={todayISO}                 // disallow future dates in the picker
+            error={birthdateError}         // LIVE red helper + red border
+          />
         </Row>
+
         <Row two>
-          <Field label="Age" type="number" value={form.age} setValue={v=>set("age",v)} required />
+          <Field
+            label="Age"
+            type="number"
+            value={form.age}
+            setValue={v=>set("age",v)}
+            required
+            min={0}
+            max={120}
+            error={ageError}
+          />
           <Field label="Contact Number" value={form.contactNumber} setValue={v=>set("contactNumber",v)} digitsOnly digitsOnlyExact={11} />
         </Row>
+
+        {isInfant && (
+          <div className="text-xs text-gray-600 -mt-2 mb-2">
+            Age based on birthdate: {infantMonths} month{infantMonths === 1 ? "" : "s"}
+          </div>
+        )}
+
         <Field
           label="Contact Person"
           value={form.contactPerson}
@@ -391,6 +476,9 @@ function Field({
   digitsOnlyExact,       // exact digit length (e.g., 11)
   oneDecimal = false,    // allow at most 1 decimal place
   disabled = false,
+  min,                   // pass-through for inputs like date/number
+  max,                   // pass-through for inputs like date/number
+  error = "",            // live error message string
 }) {
   const onlyDigits = (s) => s.replace(/\D+/g, "");
 
@@ -426,13 +514,17 @@ function Field({
   const showLenError =
     exactLen !== null && value && String(value).length > 0 && String(value).length !== exactLen;
 
+  const hasError = !!error || showLenError;
+
   return (
     <div>
       <label className="block text-sm mb-1">
         {label}{required && <span className="text-red-500"> *</span>}:
       </label>
       <input
-        className={`w-full border rounded px-3 py-2 bg-white ${disabled ? "opacity-70 cursor-not-allowed bg-gray-50" : ""} ${showLenError ? "border-red-400" : ""}`}
+        className={`w-full border rounded px-3 py-2 bg-white ${
+          disabled ? "opacity-70 cursor-not-allowed bg-gray-50" : ""
+        } ${hasError ? "border-red-400" : ""}`}
         type={(digitsOnly || oneDecimal) ? "text" : type}
         inputMode={oneDecimal ? "decimal" : (digitsOnly ? "numeric" : undefined)}
         pattern={oneDecimal ? "^\\d+(\\.\\d)?$" : (exactLen ? `\\d{${exactLen}}` : (digitsOnly ? "\\d*" : undefined))}
@@ -441,42 +533,63 @@ function Field({
         onChange={handleChange}
         placeholder={placeholder}
         step={step}
+        min={min}
+        max={max}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="none"
         spellCheck={false}
         required={required}
         disabled={disabled}
-        aria-invalid={showLenError ? "true" : "false"}
-        title={exactLen ? `Must be exactly ${exactLen} digits` : (oneDecimal ? "Use at most 1 decimal place" : undefined)}
+        aria-invalid={hasError ? "true" : "false"}
+        title={
+          exactLen
+            ? `Must be exactly ${exactLen} digits`
+            : (oneDecimal ? "Use at most 1 decimal place" : undefined)
+        }
       />
       {showLenError && (
         <div className="text-xs text-red-600 mt-1">
           Must be exactly {exactLen} digits.
         </div>
       )}
+      {!!error && (
+        <div className="text-xs text-red-600 mt-1">{error}</div>
+      )}
     </div>
   );
 }
 
-function Select({label,value,onChange,options,required=false}) {
-  return <div>
-    <label className="block text-sm mb-1">{label}{required && <span className="text-red-500"> *</span>}:</label>
-    <div className="relative">
-      <select className="w-full border rounded px-3 py-2 appearance-none bg-white"
-        value={value} onChange={e=>onChange(e.target.value)} required={required}>
-        <option value="" disabled>Select…</option>
-        {options.map(o=><option key={o} value={o}>{o}</option>)}
-      </select>
-      <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">▾</div>
+function Select({ label, value, onChange, options, required = false }) {
+  return (
+    <div>
+      <label className="block text-sm mb-1">
+        {label}{required && <span className="text-red-500"> *</span>}:
+      </label>
+      <div className="relative">
+        <select
+          className="w-full border rounded px-3 py-2 appearance-none bg-white"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required={required}
+        >
+          <option value="" disabled>Select...</option>
+          {options.map((o) => (
+            <option key={o} value={o}>{o}</option>
+          ))}
+        </select>
+        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
+          v
+        </div>
+      </div>
     </div>
-  </div>;
+  );
 }
 
 /* ---------------- Patient Records ---------------- */
 function PatientRecords() {
   const [q, setQ] = useState("");
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState([]); // <-- fixed (was "the [items, setItems]")
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const firstRun = useRef(false);
@@ -490,7 +603,6 @@ function PatientRecords() {
   useEffect(() => {
     const t = setTimeout(() => void load(), 300);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
   async function load() {
@@ -540,7 +652,7 @@ function PatientRecords() {
       <div className="flex items-center gap-3 mb-4">
         <input
           className="flex-1 border rounded px-3 py-2"
-          placeholder="Search by Family No. or Surname…"
+          placeholder="Search by Family No. or Surname..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoComplete="off"
@@ -550,7 +662,7 @@ function PatientRecords() {
           onClick={() => void load()}
           disabled={loading}
         >
-          {loading ? "Loading…" : "Refresh"}
+          {loading ? "Loading..." : "Refresh"}
         </button>
       </div>
 

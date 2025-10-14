@@ -1,7 +1,9 @@
 // src/components/ReferralForm.jsx
 import React, { useEffect, useState } from "react";
 import { FormArea, FormField } from "./inputs";
+import SignatureDialog from "./signaturePad/SignatureDialog"; // ← NEW
 
+// --- helpers ---
 function todayStr() {
   const d = new Date();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -9,14 +11,38 @@ function todayStr() {
   return `${mm}/${dd}/${d.getFullYear()}`;
 }
 const fullName = (p) => [p?.first_name, p?.middle_name, p?.surname].filter(Boolean).join(" ");
-const ageSex = (p) => `${p?.age ?? "—"}/${p?.sex ?? "—"}`;
+
+// show months when < 12 months, else show whole years (fallbacks to stored age)
+function ageDisplayFromBirthdate(birthdate, fallbackAge) {
+  if (!birthdate) return (fallbackAge ?? "") === "" ? "—" : String(fallbackAge);
+  const bd = new Date(birthdate);
+  if (isNaN(bd)) return (fallbackAge ?? "") === "" ? "—" : String(fallbackAge);
+
+  const now = new Date();
+  let months = (now.getFullYear() - bd.getFullYear()) * 12 + (now.getMonth() - bd.getMonth());
+  if (now.getDate() < bd.getDate()) months -= 1;
+  months = Math.max(0, months);
+
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"}`;
+  const years = Math.floor(months / 12);
+  return `${years}`;
+}
+function sexDisplay(sex) {
+  if (!sex) return "—";
+  const s = String(sex).toUpperCase();
+  if (s === "MEN") return "MALE";
+  if (s === "WOMEN") return "FEMALE";
+  return s;
+}
+const ageSexFromPatient = (p) =>
+  `${ageDisplayFromBirthdate(p?.birthdate, p?.age)} / ${sexDisplay(p?.sex)}`;
 
 export default function ReferralForm({ active, onBack, onSavePdf }) {
   const [form, setForm] = useState({
     date: todayStr(),
     receivingHospital: "",
     patientName: fullName(active),
-    ageSex: ageSex(active),
+    ageSex: ageSexFromPatient(active),
     nationality: "",
     vs_bp: "",
     vs_pr: "",
@@ -27,20 +53,70 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
     impression: "",
     medsGiven: "",
     reason: "",
-    doctorSignature: "",
+    doctorSignature: "",     // printed name (kept)
+    doctorSignaturePng: "",  // ← NEW: drawn signature (PNG data URL)
   });
+
+  // track missing fields after validation (for small inline hints)
+  const [missing, setMissing] = useState([]);
+  const [sigOpen, setSigOpen] = useState(false); // ← NEW: modal open/close
 
   useEffect(() => {
     setForm((s) => ({
       ...s,
       date: s.date || todayStr(),
       patientName: fullName(active) || s.patientName,
-      ageSex: ageSex(active) || s.ageSex,
+      ageSex: ageSexFromPatient(active) || s.ageSex,
     }));
-  }, [active?.id]);
+  }, [active?.id, active?.birthdate, active?.age, active?.sex]); // keep fresh if any changes
 
   const set = (k, v) => setForm((s) => ({ ...s, [k]: v }));
   const v = (x, fallback = "—") => (x && String(x).trim()) || fallback;
+
+  // ---------- Validation ----------
+  const REQUIRED_FIELDS = [
+    ["date", "Date"],
+    ["receivingHospital", "Receiving Hospital"],
+    ["patientName", "Name of Patient"],
+    ["ageSex", "Age/Sex"],
+    ["nationality", "Nationality"],
+    ["vs_bp", "BP"],
+    ["vs_pr", "PR"],
+    ["vs_rr", "RR"],
+    ["vs_temp", "Temp"],
+    ["history", "Pertinent History"],
+    ["pe", "Physical Exam"],
+    ["impression", "Impression/Diagnosis"],
+    ["medsGiven", "Medications Given"],
+    ["reason", "Reason for Referral"],
+    ["doctorSignature", "Physician Signature/Name"], // printed name remains required
+    // If you want the drawn signature to be required too, uncomment the next line:
+    // ["doctorSignaturePng", "Physician Drawn Signature"],
+  ];
+
+  const validateBeforeSave = () => {
+    const blanks = REQUIRED_FIELDS
+      .filter(([key]) => !String(form[key] ?? "").trim())
+      .map(([, label]) => label);
+
+    setMissing(blanks);
+
+    if (blanks.length) {
+      const msg =
+        "Please fill all required fields before saving:\n\n• " +
+        blanks.join("\n• ");
+      alert(msg);
+      return false;
+    }
+    return true;
+  };
+
+  const handleSavePdf = () => {
+    if (!validateBeforeSave()) return;
+    onSavePdf(form);
+  };
+
+  const isMissing = (label) => missing.includes(label);
 
   return (
     <div className="bg-white border rounded p-4 print:p-0">
@@ -50,7 +126,10 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
           <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">
             Back
           </button>
-          <button onClick={() => onSavePdf(form)} className="px-3 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-sm">
+          <button
+            onClick={handleSavePdf}
+            className="px-3 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-sm"
+          >
             Save as PDF
           </button>
         </div>
@@ -65,30 +144,123 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
           </div>
 
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <FormField label="Date" value={form.date} onChange={(v) => set("date", v)} />
-            <FormField label="Receiving Hospital" value={form.receivingHospital} onChange={(v) => set("receivingHospital", v)} />
-            <FormField label="Name of Patient" value={form.patientName} onChange={(v) => set("patientName", v)} />
-            <FormField label="Age/Sex" value={form.ageSex} onChange={(v) => set("ageSex", v)} />
-            <FormField label="Nationality" value={form.nationality} onChange={(v) => set("nationality", v)} />
+            <div>
+              <FormField label="Date" value={form.date} onChange={(v) => set("date", v)} />
+              {isMissing("Date") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            </div>
+            <div>
+              <FormField label="Receiving Hospital" value={form.receivingHospital} onChange={(v) => set("receivingHospital", v)} />
+              {isMissing("Receiving Hospital") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            </div>
+            <div>
+              <FormField label="Name of Patient" value={form.patientName} onChange={(v) => set("patientName", v)} />
+              {isMissing("Name of Patient") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            </div>
+            {/* Age/Sex shows month rule; still editable if they need to override */}
+            <div>
+              <FormField label="Age/Sex" value={form.ageSex} onChange={(v) => set("ageSex", v)} />
+              {isMissing("Age/Sex") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            </div>
+            <div>
+              <FormField label="Nationality" value={form.nationality} onChange={(v) => set("nationality", v)} />
+              {isMissing("Nationality") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            </div>
           </div>
 
           <div className="mt-4 text-sm grid grid-cols-4 gap-3">
-            <FormField label="BP" value={form.vs_bp} onChange={(v) => set("vs_bp", v)} />
-            <FormField label="PR" value={form.vs_pr} onChange={(v) => set("vs_pr", v)} />
-            <FormField label="RR" value={form.vs_rr} onChange={(v) => set("vs_rr", v)} />
-            <FormField label="Temp" value={form.vs_temp} onChange={(v) => set("vs_temp", v)} />
+            <div>
+              <FormField label="BP" value={form.vs_bp} onChange={(v) => set("vs_bp", v)} />
+              {isMissing("BP") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            </div>
+            <div>
+              <FormField label="PR" value={form.vs_pr} onChange={(v) => set("vs_pr", v)} />
+              {isMissing("PR") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            </div>
+            <div>
+              <FormField label="RR" value={form.vs_rr} onChange={(v) => set("vs_rr", v)} />
+              {isMissing("RR") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            </div>
+            <div>
+              <FormField label="Temp" value={form.vs_temp} onChange={(v) => set("vs_temp", v)} />
+              {isMissing("Temp") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            </div>
           </div>
 
-          <FormArea label="Pertinent History" value={form.history} onChange={(v) => set("history", v)} />
-          <FormArea label="Physical Exam" value={form.pe} onChange={(v) => set("pe", v)} />
-          <FormArea label="Impression/Diagnosis" value={form.impression} onChange={(v) => set("impression", v)} />
-          <FormArea label="Medications Given" value={form.medsGiven} onChange={(v) => set("medsGiven", v)} />
-          <FormArea label="Reason for Referral" value={form.reason} onChange={(v) => set("reason", v)} />
+          <div>
+            <FormArea label="Pertinent History" value={form.history} onChange={(v) => set("history", v)} />
+            {isMissing("Pertinent History") && <div className="text-xs text-red-600 mt-1">Required</div>}
+          </div>
+          <div>
+            <FormArea label="Physical Exam" value={form.pe} onChange={(v) => set("pe", v)} />
+            {isMissing("Physical Exam") && <div className="text-xs text-red-600 mt-1">Required</div>}
+          </div>
+          <div>
+            <FormArea label="Impression/Diagnosis" value={form.impression} onChange={(v) => set("impression", v)} />
+            {isMissing("Impression/Diagnosis") && <div className="text-xs text-red-600 mt-1">Required</div>}
+          </div>
+          <div>
+            <FormArea label="Medications Given" value={form.medsGiven} onChange={(v) => set("medsGiven", v)} />
+            {isMissing("Medications Given") && <div className="text-xs text-red-600 mt-1">Required</div>}
+          </div>
+          <div>
+            <FormArea label="Reason for Referral" value={form.reason} onChange={(v) => set("reason", v)} />
+            {isMissing("Reason for Referral") && <div className="text-xs text-red-600 mt-1">Required</div>}
+          </div>
 
-          <div className="mt-6 text-sm">
-            <FormField label="Signature over Printed Name of Referring Physician" value={form.doctorSignature} onChange={(v) => set("doctorSignature", v)} />
+          {/* Printed name (kept) + capture signature (new) */}
+          <div className="mt-6 text-sm space-y-2">
+            <FormField
+              label="Signature over Printed Name of Referring Physician (Printed Name)"
+              value={form.doctorSignature}
+              onChange={(v) => set("doctorSignature", v)}
+            />
+            {isMissing("Physician Signature/Name") && (
+              <div className="text-xs text-red-600 mt-1">Required</div>
+            )}
+
+            <div className="flex items-start gap-4">
+              <button
+                type="button"
+                onClick={() => setSigOpen(true)}
+                className="rounded-md border px-3 py-1 hover:bg-slate-50"
+              >
+                {form.doctorSignaturePng ? "Retake Signature" : "Capture Signature"}
+              </button>
+
+              {form.doctorSignaturePng && (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={form.doctorSignaturePng}
+                    alt="Physician Signature"
+                    className="max-h-20 border rounded bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => set("doctorSignaturePng", "")}
+                    className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* If you made the drawn signature required (REQUIRED_FIELDS includes doctorSignaturePng), this shows the inline hint */}
+            {isMissing("Physician Drawn Signature") && !form.doctorSignaturePng && (
+              <div className="text-xs text-red-600">Signature is required</div>
+            )}
           </div>
         </div>
+
+        {/* Reusable Signature Dialog (modal) */}
+        <SignatureDialog
+          open={sigOpen}
+          onClose={() => setSigOpen(false)}
+          initialValue={form.doctorSignaturePng}
+          onDone={(png) => set("doctorSignaturePng", png)}
+          title="Physician Signature"
+          heightClass="h-56"
+        />
       </div>
 
       {/* Print-only version */}
@@ -150,7 +322,18 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
           </div>
 
           <div className="print-sign">
-            <div className="line" style={{ width: "70%" }}></div>
+            {/* If we have a PNG, show it; otherwise keep the line so layout doesn't break */}
+            {form.doctorSignaturePng ? (
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px" }}>
+                <img
+                  src={form.doctorSignaturePng}
+                  alt="Physician Signature"
+                  style={{ maxHeight: "80px", maxWidth: "70%", objectFit: "contain" }}
+                />
+              </div>
+            ) : (
+              <div className="line" style={{ width: "70%" }}></div>
+            )}
             <div className="caption">Signature over Printed Name of Referring Physician</div>
             <div className="name">{v(form.doctorSignature, " ")}</div>
           </div>

@@ -1,6 +1,7 @@
 // src/components/LabRequestForm.jsx
 import React, { useEffect, useState } from "react";
 import { fullName } from "../lib/utils";
+import SignatureDialog from "./signaturePad/SignatureDialog"; // ← NEW
 
 const LEFT_TESTS = [
   "CBC",
@@ -30,6 +31,31 @@ const RIGHT_TESTS = [
   "12 L - ECG",
 ];
 
+/* -------------------- helpers (month rule + sex normalize) -------------------- */
+function ageDisplayFromBirthdate(birthdate, fallbackAge) {
+  if (!birthdate) return (fallbackAge ?? "") === "" ? "" : String(fallbackAge);
+  const bd = new Date(birthdate);
+  if (isNaN(bd)) return (fallbackAge ?? "") === "" ? "" : String(fallbackAge);
+
+  const now = new Date();
+  let months =
+    (now.getFullYear() - bd.getFullYear()) * 12 + (now.getMonth() - bd.getMonth());
+  if (now.getDate() < bd.getDate()) months -= 1;
+  months = Math.max(0, months);
+
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"}`;
+  const years = Math.floor(months / 12);
+  return `${years}`;
+}
+
+function sexDisplay(sex) {
+  if (!sex) return "";
+  const s = String(sex).toUpperCase();
+  if (s === "MEN") return "MALE";
+  if (s === "WOMEN") return "FEMALE";
+  return s;
+}
+
 export default function LabRequestForm({ active, onBack, onSavePdf }) {
   const todayStr = () => {
     const d = new Date();
@@ -40,8 +66,8 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
 
   const [form, setForm] = useState({
     patientName: fullName(active),
-    age: active?.age ?? "",
-    gender: active?.sex ?? "",
+    age: ageDisplayFromBirthdate(active?.birthdate, active?.age),
+    gender: sexDisplay(active?.sex),
     date: todayStr(),
     tests: {}, // { testName: true }
     others: "",
@@ -49,18 +75,22 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
     licNo: "",
     ptrNo: "",
     s2No: "",
+    doctorSignaturePng: "", // ← NEW: drawn signature PNG
   });
+
+  // modal open/close (NEW)
+  const [sigOpen, setSigOpen] = useState(false);
 
   useEffect(() => {
     setForm((s) => ({
       ...s,
       patientName: fullName(active) || s.patientName,
-      age: active?.age ?? s.age,
-      gender: active?.sex ?? s.gender,
+      age: ageDisplayFromBirthdate(active?.birthdate, active?.age) || s.age,
+      gender: sexDisplay(active?.sex) || s.gender,
       date: s.date || todayStr(),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active?.record_id]);
+  }, [active?.record_id, active?.birthdate, active?.age, active?.sex]);
 
   const set = (k, v) => setForm((s) => ({ ...s, [k]: v }));
   const toggleTest = (name) =>
@@ -69,7 +99,39 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
   const isChecked = (name) => !!form.tests[name];
   const v = (x) => (x && String(x).trim()) || "";
 
-  const onSave = () => onSavePdf(form);
+  // -------------- Validation: required fields + at least one test --------------
+  const validateBeforeSave = () => {
+    const missing = [];
+
+    if (!v(form.patientName)) missing.push("Patient’s Name");
+    if (!v(form.date)) missing.push("Date");
+    if (!v(form.age)) missing.push("Age");
+    if (!v(form.gender)) missing.push("Gender");
+    if (!v(form.doctorName)) missing.push("Physician (MD)");
+    if (!v(form.licNo)) missing.push("Lic. No.");
+    // If you want drawn signature to be required, uncomment:
+    // if (!v(form.doctorSignaturePng)) missing.push("Physician Signature (drawn)");
+
+    const anyChecked = Object.values(form.tests || {}).some(Boolean);
+    const othersFilled = !!v(form.others);
+    if (!anyChecked && !othersFilled) {
+      missing.push("At least one laboratory test (check a box) or fill 'Others'");
+    }
+
+    if (missing.length) {
+      alert(
+        "Please complete the following before saving as PDF:\n\n• " +
+          missing.join("\n• ")
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const onSave = () => {
+    if (!validateBeforeSave()) return;
+    onSavePdf(form); // includes doctorSignaturePng now
+  };
 
   return (
     <div className="bg-white border rounded p-4 print:p-0">
@@ -151,6 +213,40 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
               />
             </Field>
             <div />
+
+            {/* --- Signature capture UI (NEW, below Physician field) --- */}
+            <div className="md:col-span-2">
+              <div className="text-xs text-slate-600 mb-1">
+                Capture physician’s handwritten signature (prints above MD label)
+              </div>
+              <div className="flex items-start gap-4">
+                <button
+                  type="button"
+                  onClick={() => setSigOpen(true)}
+                  className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                >
+                  {form.doctorSignaturePng ? "Retake Signature" : "Capture Signature"}
+                </button>
+
+                {form.doctorSignaturePng && (
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={form.doctorSignaturePng}
+                      alt="Physician Signature"
+                      className="max-h-20 border rounded bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => set("doctorSignaturePng", "")}
+                      className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <Field label="Lic. No.">
               <input
                 className="w-full border rounded px-3 py-2"
@@ -213,6 +309,16 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
 
             <div className="lr-sign">
               <div className="sig-right">
+                {/* NEW: show signature image if available */}
+                {v(form.doctorSignaturePng) ? (
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
+                    <img
+                      src={form.doctorSignaturePng}
+                      alt="Physician Signature"
+                      style={{ maxHeight: "80px", maxWidth: "70%", objectFit: "contain" }}
+                    />
+                  </div>
+                ) : null}
                 <div className="sig-name">{v(form.doctorName) || "\u00A0"}</div>
                 <div className="sig-caption">MD</div>
               </div>
@@ -260,6 +366,16 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
           .print-only { display: block !important; }
         }
       `}</style>
+
+      {/* Signature modal lives outside the screen/print sections */}
+      <SignatureDialog
+        open={sigOpen}
+        onClose={() => setSigOpen(false)}
+        initialValue={form.doctorSignaturePng}
+        onDone={(png) => set("doctorSignaturePng", png)}
+        title="Physician Signature"
+        heightClass="h-56"
+      />
     </div>
   );
 }
