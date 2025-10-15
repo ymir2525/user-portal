@@ -55,7 +55,8 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
           .eq("id", uid)
           .single();
 
-        const dn = prof?.full_name || `${prof?.firstname ?? ""} ${prof?.surname ?? ""}`.trim();
+        const dn =
+          prof?.full_name || `${prof?.firstname ?? ""} ${prof?.surname ?? ""}`.trim();
         if (mounted && dn) setPrefillDocName(dn);
       } catch {
         /* ignore */
@@ -67,17 +68,22 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
   }, []);
 
   const [form, setForm] = useState({
+    // fetched + read-only
     date: today(),
     name: patientName(),
     age: ageDisplayFromBirthdate(active?.birthdate, active?.age),
     sex: sexDisplay(active?.sex),
+
+    // editable (consultedOn is now manual)
+    consultedOn: "",
     address: "",
     consultVerb: "was examined",
-    consultedOn: "",
     reasonFor: "",
     assessment: "",
     recommendation: "",
-    doctorName: "", // set after we fetch profile
+
+    // doctor
+    doctorName: "",
     licenseNo: "",
     doctorSignaturePng: "", // ← NEW: drawn signature
   });
@@ -89,10 +95,11 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
   useEffect(() => {
     setForm((s) => ({
       ...s,
-      date: s.date || today(),
+      date: s.date || today(), // read-only
       name: patientName() || s.name,
       age: ageDisplayFromBirthdate(active?.birthdate, active?.age) || s.age || "",
       sex: sexDisplay(active?.sex) || s.sex || "",
+      // consultedOn stays as the user typed; no auto-fill
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.record_id, active?.birthdate, active?.age, active?.sex]);
@@ -164,39 +171,24 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
         <div className="max-w-3xl mx-auto border p-6 space-y-4 text-sm">
           <HeaderPreview />
 
+          {/* Fetched, read-only fields */}
           <div className="grid md:grid-cols-2 gap-3">
             <L label="Date">
-              <input
-                className="w-full border rounded px-3 py-2"
-                value={form.date}
-                onChange={(e) => set("date", e.target.value)}
-              />
+              <ReadOnlyInput value={form.date} />
             </L>
             <div />
           </div>
 
           <L label="Patient Name">
-            <input
-              className="w-full border rounded px-3 py-2"
-              value={form.name}
-              onChange={(e) => set("name", e.target.value)}
-            />
+            <ReadOnlyInput value={form.name} />
           </L>
 
           <div className="grid md:grid-cols-3 gap-3">
             <L label="Age">
-              <input
-                className="w-full border rounded px-3 py-2"
-                value={form.age}
-                onChange={(e) => set("age", e.target.value)}
-              />
+              <ReadOnlyInput value={form.age} />
             </L>
             <L label="Sex">
-              <input
-                className="w-full border rounded px-3 py-2"
-                value={form.sex}
-                onChange={(e) => set("sex", e.target.value)}
-              />
+              <ReadOnlyInput value={form.sex} />
             </L>
             <L label="Address">
               <input
@@ -220,13 +212,17 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
                 <option>confined</option>
               </select>
             </L>
+
+            {/* Consulted date — now manual input */}
             <L label="Consulted/Examined/Treated/Confined on (date)">
               <input
                 className="w-full border rounded px-3 py-2"
+                placeholder="MM/DD/YYYY"
                 value={form.consultedOn}
                 onChange={(e) => set("consultedOn", e.target.value)}
               />
             </L>
+
             <L label="For (reason/diagnosis)">
               <input
                 className="w-full border rounded px-3 py-2"
@@ -348,7 +344,6 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
             </div>
 
             <div className="mc-sign">
-              {/* NEW: render signature image above the printed name if present */}
               {v(form.doctorSignaturePng) ? (
                 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
                   <img
@@ -453,5 +448,18 @@ function L({ label, children }) {
       <div className="text-xs font-semibold mb-1">{label}</div>
       {children}
     </label>
+  );
+}
+
+/** Read-only UI that looks like an input */
+function ReadOnlyInput({ value }) {
+  return (
+    <div
+      className="w-full border rounded px-3 py-2 bg-gray-50 text-gray-600"
+      tabIndex={-1}
+      aria-readonly="true"
+    >
+      {value || ""}
+    </div>
   );
 }

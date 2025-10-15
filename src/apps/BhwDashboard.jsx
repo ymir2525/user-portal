@@ -91,7 +91,32 @@ function PatientRegistration() {
   // Cap date inputs to today
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // Live error for Birthdate (future/invalid)
+  // ---------- LIVE VALIDATIONS ----------
+  // Letters-only (no numbers / special chars). Allow spaces.
+  const lettersOnlyBad = (s) => /[^A-Za-z\s]/.test(s || "");
+
+  // Numbers-only (no letters/spaces) for Family Number
+  const familyNumberError = useMemo(() => {
+    if (!form.familyNumber) return "";
+    return /[^0-9]/.test(form.familyNumber) ? "Numbers only." : "";
+  }, [form.familyNumber]);
+
+  const surnameError = useMemo(() => {
+    if (!form.surname) return "";
+    return lettersOnlyBad(form.surname) ? "Letters and spaces only." : "";
+  }, [form.surname]);
+
+  const firstNameError = useMemo(() => {
+    if (!form.firstName) return "";
+    return lettersOnlyBad(form.firstName) ? "Letters and spaces only." : "";
+  }, [form.firstName]);
+
+  const middleNameError = useMemo(() => {
+    if (!form.middleName) return ""; // blank allowed
+    return lettersOnlyBad(form.middleName) ? "Letters and spaces only." : "";
+  }, [form.middleName]);
+
+  // Birthdate (future/invalid)
   const birthdateError = useMemo(() => {
     if (!form.birthdate) return "";
     const bd = new Date(form.birthdate);
@@ -132,6 +157,17 @@ function PatientRegistration() {
     return "";
   }, [form.age]);
 
+  // Blood Pressure: allow numbers and a single "/" only; live error on violations
+  const bpError = useMemo(() => {
+    if (!form.bloodPressure) return "";
+    const s = String(form.bloodPressure);
+    const slashCount = (s.match(/\//g) || []).length;
+    if (/[^\d/]/.test(s)) return 'Only numbers and "/" are allowed.';
+    if (slashCount > 1) return 'Only one "/" is allowed.';
+    if (!/^\d{1,3}(?:\/\d{1,3})?$/.test(s)) return 'Format must be like "120/80".';
+    return "";
+  }, [form.bloodPressure]);
+
   // Family→surname lock state
   const [famLockSurname, setFamLockSurname] = useState(null); // string | null
   const [famLookupLoading, setFamLookupLoading] = useState(false);
@@ -139,8 +175,9 @@ function PatientRegistration() {
 
   const set = (k, v) => setField(k, v);
 
-  // ----- VALIDATION -----
+  // ----- VALIDATION (submit-time) -----
   const validate = () => {
+    // required
     if (!form.familyNumber.trim()) return "Family Number is required.";
     if (!form.surname.trim()) return "Surname is required.";
     if (!form.firstName.trim()) return "First Name is required.";
@@ -148,23 +185,29 @@ function PatientRegistration() {
     if (!form.birthdate) return "Birthdate is required.";
     if (!form.age) return "Age is required.";
 
-    // Block future birthdates
+    // checks
+    if (/[^0-9]/.test(form.familyNumber)) return "Family Number must contain numbers only.";
+    if (lettersOnlyBad(form.surname)) return "Surname must contain letters and spaces only.";
+    if (lettersOnlyBad(form.firstName)) return "First Name must contain letters and spaces only.";
+    if (form.middleName && lettersOnlyBad(form.middleName)) return "Middle Name must contain letters and spaces only.";
+
+    // Birthdate rules
     const bd = new Date(form.birthdate);
     const today = new Date();
     today.setHours(0,0,0,0);
     if (isNaN(bd.getTime())) return "Birthdate is invalid.";
     if (bd > today) return "Birthdate cannot be in the future.";
 
-    // Age typed must not exceed 120
+    // Age caps
     if (Number(form.age) > 120) return "Age must not exceed 120.";
-
-    // Birthdate-derived years must not exceed 120
     if (birthdateYears !== null && birthdateYears > 120) return "Birthdate implies age over 120.";
 
+    // Family number lock
     if (famLockSurname && norm(form.surname) !== norm(famLockSurname)) {
       return `Family Number is already assigned to surname "${famLockSurname}". Please use that surname or choose a different Family Number.`;
     }
 
+    // Contacts
     if (form.contactNumber && String(form.contactNumber).length !== 11)
       return "Contact Number must be exactly 11 digits.";
     if (form.contactPerson && String(form.contactPerson).length !== 11)
@@ -175,10 +218,19 @@ function PatientRegistration() {
     if (form.weightKg && !oneDec.test(form.weightKg)) return "Weight must have at most 1 decimal place.";
     if (form.temperatureC && !oneDec.test(form.temperatureC)) return "Temperature must have at most 1 decimal place.";
 
+    // BP format final check
+    if (form.bloodPressure) {
+      const s = String(form.bloodPressure);
+      const slashCount = (s.match(/\//g) || []).length;
+      if (/[^\d/]/.test(s)) return 'Blood Pressure may only contain numbers and "/".';
+      if (slashCount > 1) return 'Blood Pressure may contain only one "/".';
+      if (!/^\d{1,3}(?:\/\d{1,3})?$/.test(s)) return 'Blood Pressure must look like "120/80".';
+    }
+
     return null;
   };
 
-  const canSubmit = useMemo(() => !validate(), [form, famLockSurname, birthdateYears]);
+  const canSubmit = useMemo(() => !validate(), [form, famLockSurname, birthdateYears, bpError]);
 
   const handleSubmitClick = async (e) => {
     e.preventDefault();
@@ -186,6 +238,14 @@ function PatientRegistration() {
 
     const err = validate();
     if (err) { alert(err); return; }
+
+    // Confirm missing middle name
+    if (!form.middleName.trim()) {
+      const okMiddle = window.confirm(
+        "Are you sure this patient does not have any middle name?"
+      );
+      if (!okMiddle) return;
+    }
 
     const ok = window.confirm(
       "Finalize this registration? Make sure all required fields are complete. Click OK to submit or Cancel to review."
@@ -216,7 +276,7 @@ function PatientRegistration() {
         surname: form.surname.trim(),
         first_name: form.firstName.trim(),
         middle_name: form.middleName.trim() || null,
-        sex: sexForDb, // matches CHECK constraint: MEN/WOMEN/OTHER
+        sex: sexForDb,
         birthdate: form.birthdate || null,
         age: form.age ? Number(form.age) : null,
         contact_number: form.contactNumber.trim() || null,
@@ -236,15 +296,13 @@ function PatientRegistration() {
 
       if (error) throw error;
 
-      // If the checkbox is checked, add a queued record immediately
       if (form.proceedToQueue && data?.id) {
-        // Optional: prevent duplicates — only one queued record per patient
         const { data: existing, error: existErr } = await supabase
           .from("patient_records")
           .select("id,status")
           .eq("patient_id", data.id)
           .eq("status", "queued")
-          .maybeSingle(); // null when none
+          .maybeSingle();
 
         if (existErr) throw existErr;
 
@@ -253,7 +311,6 @@ function PatientRegistration() {
             .from("patient_records")
             .insert({
               patient_id: data.id,
-              // visit_date omitted -> uses DEFAULT CURRENT_DATE
               height_cm: payload.height_cm,
               weight_kg: payload.weight_kg,
               blood_pressure: payload.blood_pressure,
@@ -312,7 +369,6 @@ function PatientRegistration() {
     const t = setTimeout(async () => {
       try {
         setFamLookupLoading(true);
-        // Prefer exact match on family_number; adjust to ilike if your data has padding
         const { data, error } = await supabase
           .from("patients")
           .select("family_number,surname")
@@ -347,14 +403,24 @@ function PatientRegistration() {
 
       <form onSubmit={handleSubmitClick} className="bg-orange-50 rounded-xl border border-orange-200 p-6 space-y-5" autoComplete="off" aria-busy={saving}>
         <Row two>
-          <Field label="Family Number" value={form.familyNumber} setValue={v=>set("familyNumber",v)} required />
+          <Field
+            label="Family Number"
+            value={form.familyNumber}
+            setValue={v=>set("familyNumber",v)}
+            required
+            hideAsterisk
+            error={familyNumberError}
+            digitsOnly
+          />
           <div>
             <Field
               label="Surname"
               value={form.surname}
               setValue={v=>set("surname",v)}
               required
+              hideAsterisk
               disabled={!!famLockSurname}
+              error={surnameError}
             />
             {famLockSurname && (
               <div className="text-xs text-orange-700 mt-1">
@@ -368,19 +434,32 @@ function PatientRegistration() {
         </Row>
 
         <Row two>
-          <Field label="First Name" value={form.firstName} setValue={v=>set("firstName",v)} required />
-          <Field label="Middle Name" value={form.middleName} setValue={v=>set("middleName",v)} />
+          <Field
+            label="First Name"
+            value={form.firstName}
+            setValue={v=>set("firstName",v)}
+            required
+            hideAsterisk
+            error={firstNameError}
+          />
+          <Field
+            label="Middle Name"
+            value={form.middleName}
+            setValue={v=>set("middleName",v)}
+            error={middleNameError}
+          />
         </Row>
         <Row two>
-          <Select label="Sex" value={form.sex} onChange={v=>set("sex",v)} options={["MALE","FEMALE","OTHER"]} required />
+          <Select label="Sex" value={form.sex} onChange={v=>set("sex",v)} options={["MALE","FEMALE","OTHER"]} required hideAsterisk />
           <Field
             label="Birthdate"
             type="date"
             value={form.birthdate}
             setValue={v=>set("birthdate",v)}
             required
-            max={todayISO}                 // disallow future dates in the picker
-            error={birthdateError}         // LIVE red helper + red border
+            hideAsterisk
+            max={todayISO}
+            error={birthdateError}
           />
         </Row>
 
@@ -391,6 +470,7 @@ function PatientRegistration() {
             value={form.age}
             setValue={v=>set("age",v)}
             required
+            hideAsterisk
             min={0}
             max={120}
             error={ageError}
@@ -418,7 +498,13 @@ function PatientRegistration() {
           <Field label="Weight (kg)" value={form.weightKg} setValue={v=>set("weightKg",v)} oneDecimal placeholder="e.g. 83.0" />
         </Row>
         <Row two>
-          <Field label="Blood Pressure" value={form.bloodPressure} setValue={v=>set("bloodPressure",v)} placeholder="e.g. 120/80" />
+          <Field
+            label="Blood Pressure"
+            value={form.bloodPressure}
+            setValue={v=>set("bloodPressure",v)}
+            placeholder="e.g. 120/80"
+            error={bpError}
+          />
           <Field label="Temperature (°C)" value={form.temperatureC} setValue={v=>set("temperatureC",v)} oneDecimal placeholder="e.g. 37.5" />
         </Row>
 
@@ -479,6 +565,7 @@ function Field({
   min,                   // pass-through for inputs like date/number
   max,                   // pass-through for inputs like date/number
   error = "",            // live error message string
+  hideAsterisk = false,  // NEW: allow hiding the visual star while keeping required
 }) {
   const onlyDigits = (s) => s.replace(/\D+/g, "");
 
@@ -519,7 +606,7 @@ function Field({
   return (
     <div>
       <label className="block text-sm mb-1">
-        {label}{required && <span className="text-red-500"> *</span>}:
+        {label}{required && !hideAsterisk && <span className="text-red-500"> *</span>}:
       </label>
       <input
         className={`w-full border rounded px-3 py-2 bg-white ${
@@ -560,11 +647,11 @@ function Field({
   );
 }
 
-function Select({ label, value, onChange, options, required = false }) {
+function Select({ label, value, onChange, options, required = false, hideAsterisk = false }) {
   return (
     <div>
       <label className="block text-sm mb-1">
-        {label}{required && <span className="text-red-500"> *</span>}:
+        {label}{required && !hideAsterisk && <span className="text-red-500"> *</span>}:
       </label>
       <div className="relative">
         <select
@@ -618,7 +705,6 @@ function PatientRecords() {
         .order("family_number", { ascending: true });
 
       if (like) {
-        // If family_number is numeric in your schema, consider exact .eq for numbers
         query = query.or(
           `family_number.ilike.%${like}%,surname.ilike.%${like}%`
         );
@@ -627,7 +713,6 @@ function PatientRecords() {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Ensure uniqueness (defensive)
       const map = new Map();
       (data || []).forEach(r => {
         const key = `${r.family_number}||${r.surname}`;

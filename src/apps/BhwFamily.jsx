@@ -1,5 +1,5 @@
 // src/apps/BhwFamily.jsx
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { dateOnly } from "../lib/utils";
 import { supabase } from "../lib/supabase";
@@ -21,6 +21,11 @@ export default function BhwFamily() {
   // Selected patient + past records
   const [patient, setPatient] = useState(null);
   const [records, setRecords] = useState([]);
+
+  // ---------- NEW: past-record subviews ----------
+  // When user clicks a row in “Past Records”, we open a tiny sub-router.
+  const [pastView, setPastView] = useState("list"); // 'list' | 'detail' | 'chart' | 'docs'
+  const [selectedPast, setSelectedPast] = useState(null);
 
   // New-record form state
   const [form, setForm] = useState({
@@ -151,6 +156,8 @@ export default function BhwFamily() {
       setPatient(p);
       setRecords(Array.isArray(recs) ? recs : []);
       setMode("patient");
+      setPastView("list");
+      setSelectedPast(null);
     } catch (e) {
       console.error(e);
       setErr(e.message || "Failed to load patient");
@@ -183,8 +190,7 @@ export default function BhwFamily() {
         blood_pressure: form.bloodPressure || null,
         temperature_c: num(form.temperatureC),
         chief_complaint: (form.chiefComplaint || "").trim() || null,
-        queued: !!form.proceedToQueue, // your schema has queued boolean default false
-        // status defaults to 'queued' if you want; otherwise omit and let DB default handle
+        queued: !!form.proceedToQueue,
       };
 
       const { data, error } = await supabase
@@ -195,7 +201,14 @@ export default function BhwFamily() {
 
       if (error) throw error;
 
-      await openPatient(patient.id); // reload patient + records
+      // reload past records quickly
+      const { data: recs } = await supabase
+        .from("patient_records")
+        .select("*")
+        .eq("patient_id", patient.id)
+        .order("created_at", { ascending: false });
+
+      setRecords(Array.isArray(recs) ? recs : []);
 
       setForm({
         heightCm: "", weightKg: "", bloodPressure: "", temperatureC: "",
@@ -203,6 +216,7 @@ export default function BhwFamily() {
       });
       setErrors({});
       setMode("patient");
+      setPastView("list");
     } catch (e) {
       alert(e.message || "Save failed");
     } finally {
@@ -291,32 +305,69 @@ export default function BhwFamily() {
                 <div><strong>Contacts:</strong> {patient.contact_number || "-"}</div>
               </div>
 
-              <div className="text-sm font-semibold mb-1">Past Records</div>
-              <div className="space-y-2">
-                {records.length === 0 && (
-                  <div className="text-gray-500 text-sm">No past records found.</div>
-                )}
-                {records.map(r => (
-                  <div key={r.id} className="border rounded px-3 py-2 grid grid-cols-2 gap-2">
-                    <div className="text-sm">
-                      <b>{dateOnly(r.visit_date || r.created_at)}</b>
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      H: {r.height_cm ?? "—"} cm • W: {r.weight_kg ?? "—"} kg • BP: {r.blood_pressure ?? "—"} •
-                      Temp: {r.temperature_c ?? "—"} °C • CC: {r.chief_complaint || "—"}
-                    </div>
+              {/* ---------- Past Records (clickable) ---------- */}
+              {pastView === "list" && (
+                <>
+                  <div className="text-sm font-semibold mb-1">Past Records</div>
+                  <div className="space-y-2">
+                    {records.length === 0 && (
+                      <div className="text-gray-500 text-sm">No past records found.</div>
+                    )}
+                    {records.map(r => (
+                      <button
+                        key={r.id}
+                        onClick={() => { setSelectedPast(r); setPastView("detail"); }}
+                        className="w-full text-left border rounded px-3 py-2 hover:bg-orange-50"
+                      >
+                        <div className="font-medium">
+                          {dateOnly(r.completed_at || r.visit_date || r.created_at)}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          H: {r.height_cm ?? "—"} cm • W: {r.weight_kg ?? "—"} kg • BP: {r.blood_pressure ?? "—"} •
+                          Temp: {r.temperature_c ?? "—"} °C • CC: {r.chief_complaint || "—"}
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              <div className="mt-6">
-                <button
-                  onClick={() => setMode("members")}
-                  className="px-4 py-2 rounded bg-orange-500 text-white hover:bg-orange-600"
-                >
-                  Back
-                </button>
-              </div>
+                  <div className="mt-6">
+                    <button
+                      onClick={() => setMode("members")}
+                      className="px-4 py-2 rounded bg-orange-500 text-white hover:bg-orange-600"
+                    >
+                      Back
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* ---------- Past Record: Detail menu ---------- */}
+              {pastView === "detail" && selectedPast && (
+                <PastDetail
+                  rec={selectedPast}
+                  patient={patient}
+                  onBack={() => { setPastView("list"); setSelectedPast(null); }}
+                  onViewChart={() => setPastView("chart")}
+                  onViewDocs={() => setPastView("docs")}
+                />
+              )}
+
+              {/* ---------- Past Record: Chart view ---------- */}
+              {pastView === "chart" && selectedPast && (
+                <PastChartViewLite
+                  rec={selectedPast}
+                  patient={patient}
+                  onBack={() => setPastView("detail")}
+                />
+              )}
+
+              {/* ---------- Past Record: Documents view ---------- */}
+              {pastView === "docs" && selectedPast && (
+                <PastDocumentsViewLite
+                  rec={selectedPast}
+                  onBack={() => setPastView("detail")}
+                />
+              )}
             </div>
           )}
 
@@ -399,6 +450,114 @@ export default function BhwFamily() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/* ---------- Small subviews for past record ---------- */
+
+function PastDetail({ rec, patient, onBack, onViewChart, onViewDocs }) {
+  return (
+    <div className="max-w-3xl mx-auto">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">{dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
+        <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">Back</button>
+      </div>
+
+      <div className="mt-3 text-sm space-y-1">
+        <div><strong>Patient Name:</strong> {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}</div>
+        <div><strong>Doctor in Charge:</strong> {rec.doctor_full_name || "—"}</div>
+        <div><strong>Date:</strong> {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</div>
+      </div>
+
+      <div className="mt-6 space-y-3">
+        <button onClick={onViewChart} className="w-full rounded py-2 bg-orange-300 text-white hover:bg-orange-400">View Chart</button>
+        <button onClick={onViewDocs} className="w-full rounded py-2 bg-orange-300 text-white hover:bg-orange-400">View Documents</button>
+      </div>
+    </div>
+  );
+}
+
+function PastChartViewLite({ rec, patient, onBack }) {
+  return (
+    <div className="max-w-3xl mx-auto">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Chart – {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
+        <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">Back</button>
+      </div>
+
+      <div className="mt-4 grid md:grid-cols-2 gap-4 text-sm">
+        <div className="border rounded p-3 bg-white">
+          <div className="font-semibold mb-2">Nurse Vitals</div>
+          <div>Height: {rec.height_cm ?? "—"} cm</div>
+          <div>Weight: {rec.weight_kg ?? "—"} kg</div>
+          <div>BP: {rec.blood_pressure ?? "—"}</div>
+          <div>Temperature: {rec.temperature_c ?? "—"} °C</div>
+          <div>Chief Complaint: {rec.chief_complaint || "—"}</div>
+        </div>
+        <div className="border rounded p-3 bg-white">
+          <div className="font-semibold mb-2">Doctor’s Notes</div>
+          <div className="whitespace-pre-wrap">{rec.doctor_notes || "—"}</div>
+          <div className="mt-2 text-xs text-gray-600">Doctor: {rec.doctor_full_name || "—"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PastDocumentsViewLite({ rec, onBack }) {
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true); setErr("");
+        const { data, error } = await supabase
+          .from("record_documents")
+          .select("*")
+          .eq("record_id", rec.id)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+        if (mounted) setDocs(Array.isArray(data) ? data : []);
+      } catch (e) {
+        if (mounted) setErr(e.message || "Failed to load documents");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [rec.id]);
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Document Request</h3>
+        <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">Back</button>
+      </div>
+
+      <div className="mt-3 border rounded p-4 bg-orange-50">
+        {loading && <div className="text-sm text-gray-600">Loading…</div>}
+        {err && <div className="text-sm text-red-600">{err}</div>}
+        {!loading && !err && (
+          <div className="space-y-3">
+            {docs.length === 0 && <div className="text-sm text-gray-600">No documents saved for this record.</div>}
+            {docs.map(d => (
+              <div key={d.id} className="border rounded px-3 py-2 bg-white flex items-center justify-between">
+                <div className="font-semibold uppercase">
+                  {d.type} <span className="normal-case text-gray-600 text-xs">• {new Date(d.created_at).toLocaleString()}</span>
+                </div>
+                <div className="text-xs text-gray-600">
+                  {d.url ? <a className="underline" href={d.url} target="_blank" rel="noreferrer">open file</a> : "no file URL"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

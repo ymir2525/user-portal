@@ -158,21 +158,18 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
       <div className="screen-only">
         <div className="max-w-4xl mx-auto border p-6">
           <div className="grid md:grid-cols-2 gap-3">
+            {/* READ-ONLY fetched fields */}
             <Field label="Patient’s Name">
-              <input className="w-full border rounded px-3 py-2"
-                value={form.patientName} onChange={(e)=>set("patientName", e.target.value)} />
+              <ReadOnlyInput value={form.patientName} />
             </Field>
             <Field label="Date">
-              <input className="w-full border rounded px-3 py-2"
-                value={form.date} onChange={(e)=>set("date", e.target.value)} />
+              <ReadOnlyInput value={form.date} />
             </Field>
             <Field label="Age">
-              <input className="w-full border rounded px-3 py-2"
-                value={form.age} onChange={(e)=>set("age", e.target.value)} />
+              <ReadOnlyInput value={form.age} />
             </Field>
             <Field label="Gender">
-              <input className="w-full border rounded px-3 py-2"
-                value={form.gender} onChange={(e)=>set("gender", e.target.value)} />
+              <ReadOnlyInput value={form.gender} />
             </Field>
           </div>
 
@@ -386,6 +383,18 @@ function Field({ label, children }) {
       <div className="text-xs font-semibold mb-1">{label}</div>
       {children}
     </label>
+  );
+}
+
+function ReadOnlyInput({ value }) {
+  return (
+    <div
+      className="w-full border rounded px-3 py-2 bg-gray-50 text-gray-600"
+      tabIndex={-1}
+      aria-readonly="true"
+    >
+      {value || ""}
+    </div>
   );
 }
 
