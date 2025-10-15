@@ -54,13 +54,14 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
     medsGiven: "",
     reason: "",
     doctorSignature: "",     // printed name (kept)
-    doctorSignaturePng: "",  // ← NEW: drawn signature (PNG data URL)
+    doctorSignaturePng: "",  // drawn signature (PNG data URL)
   });
 
   // track missing fields after validation (for small inline hints)
   const [missing, setMissing] = useState([]);
-  const [sigOpen, setSigOpen] = useState(false); // ← NEW: modal open/close
+  const [sigOpen, setSigOpen] = useState(false);
 
+  // keep fetched values in sync (still read-only in UI)
   useEffect(() => {
     setForm((s) => ({
       ...s,
@@ -68,7 +69,7 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
       patientName: fullName(active) || s.patientName,
       ageSex: ageSexFromPatient(active) || s.ageSex,
     }));
-  }, [active?.id, active?.birthdate, active?.age, active?.sex]); // keep fresh if any changes
+  }, [active?.id, active?.birthdate, active?.age, active?.sex]);
 
   const set = (k, v) => setForm((s) => ({ ...s, [k]: v }));
   const v = (x, fallback = "—") => (x && String(x).trim()) || fallback;
@@ -89,8 +90,8 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
     ["impression", "Impression/Diagnosis"],
     ["medsGiven", "Medications Given"],
     ["reason", "Reason for Referral"],
-    ["doctorSignature", "Physician Signature/Name"], // printed name remains required
-    // If you want the drawn signature to be required too, uncomment the next line:
+    ["doctorSignature", "Physician Signature/Name"],
+    // To require drawn signature too, add:
     // ["doctorSignaturePng", "Physician Drawn Signature"],
   ];
 
@@ -144,8 +145,9 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
           </div>
 
           <div className="grid grid-cols-2 gap-4 text-sm">
+            {/* Read-only fetched fields */}
             <div>
-              <FormField label="Date" value={form.date} onChange={(v) => set("date", v)} />
+              <ReadOnlyField label="Date" value={form.date} />
               {isMissing("Date") && <div className="text-xs text-red-600 mt-1">Required</div>}
             </div>
             <div>
@@ -153,12 +155,11 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
               {isMissing("Receiving Hospital") && <div className="text-xs text-red-600 mt-1">Required</div>}
             </div>
             <div>
-              <FormField label="Name of Patient" value={form.patientName} onChange={(v) => set("patientName", v)} />
+              <ReadOnlyField label="Name of Patient" value={form.patientName} />
               {isMissing("Name of Patient") && <div className="text-xs text-red-600 mt-1">Required</div>}
             </div>
-            {/* Age/Sex shows month rule; still editable if they need to override */}
             <div>
-              <FormField label="Age/Sex" value={form.ageSex} onChange={(v) => set("ageSex", v)} />
+              <ReadOnlyField label="Age/Sex" value={form.ageSex} />
               {isMissing("Age/Sex") && <div className="text-xs text-red-600 mt-1">Required</div>}
             </div>
             <div>
@@ -245,7 +246,7 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
               )}
             </div>
 
-            {/* If you made the drawn signature required (REQUIRED_FIELDS includes doctorSignaturePng), this shows the inline hint */}
+            {/* If you made the drawn signature required */}
             {isMissing("Physician Drawn Signature") && !form.doctorSignaturePng && (
               <div className="text-xs text-red-600">Signature is required</div>
             )}
@@ -322,7 +323,6 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
           </div>
 
           <div className="print-sign">
-            {/* If we have a PNG, show it; otherwise keep the line so layout doesn't break */}
             {form.doctorSignaturePng ? (
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px" }}>
                 <img
@@ -366,6 +366,22 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
           .print-only { display: block !important; }
         }
       `}</style>
+    </div>
+  );
+}
+
+/** Simple read-only display that looks like an input */
+function ReadOnlyField({ label, value }) {
+  return (
+    <div>
+      <label className="block text-xs mb-1">{label}</label>
+      <div
+        className="w-full h-10 border rounded px-3 bg-gray-50 text-gray-600 flex items-center"
+        tabIndex={-1}
+        aria-readonly="true"
+      >
+        <span className="truncate">{value || "—"}</span>
+      </div>
     </div>
   );
 }
