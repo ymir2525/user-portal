@@ -1,0 +1,327 @@
+/* ------------------------------
+   Global helpers
+------------------------------ */
+:root{
+  --orange-50:#fff7ed;
+  --orange-100:#ffedd5;
+  --orange-200:#fed7aa;
+  --orange-300:#fdba74;
+  --orange-400:#fb923c;
+  --orange-500:#f97316;
+  --orange-600:#ea580c;
+
+  --gray-50:#f9fafb;
+  --gray-100:#f3f4f6;
+  --gray-200:#e5e7eb;
+  --gray-300:#d1d5db;
+  --gray-500:#6b7280;
+  --gray-600:#4b5563;
+  --gray-700:#374151;
+
+  --red-400:#fca5a5;
+  --red-600:#b91c1c;
+
+  --green-100:#dcfce7;
+  --green-200:#bbf7d0;
+  --green-300:#86efac;
+  --green-600:#059669;
+}
+
+*{box-sizing:border-box}
+
+/* Utility if you left this class in JSX */
+.text-center{ text-align:center; }
+
+/* ------------------------------
+   Page layout
+------------------------------ */
+.family-page{
+  min-height:100vh;
+  padding:24px;
+  background:#fff;
+  color:#111827;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:16px;
+}
+
+.link{
+  color:#0b57d0;
+  background:none;
+  border:none;
+  padding:0;
+  cursor:pointer;
+  text-decoration:underline;
+  font: inherit;
+}
+.link--small{ font-size:14px; }
+
+.page-title{
+  text-align:center;
+  font-weight:600;
+  margin-bottom:16px;
+}
+.page-title--family{
+  color:#c2410c;              /* matches the orange heading in your screenshots */
+}
+
+/* Status / messages */
+.status{ text-align:center; font-size:14px; }
+.status--loading{ color:#111827; }
+
+.error-text{
+  color:var(--red-600);        /* VALIDATIONS stay red */
+  font-size:12px;
+  margin-top:6px;
+}
+.muted{ color:var(--gray-500); }
+.small{ font-size:12px; }
+.empty{
+  text-align:center;
+  font-size:14px;
+  color:var(--gray-500);
+  margin-top:12px;
+}
+
+.separator{
+  height:1px;
+  background:var(--orange-300);
+  margin:16px 0;
+  border:0;
+}
+
+/* ------------------------------
+   Member list (first screen)
+------------------------------ */
+.member-list{
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  align-items:center;
+}
+
+.member-card{
+  display:block;
+  width:100%;
+  max-width:460px;
+  border:1px solid var(--gray-700);  /* dark border like screenshot */
+  border-radius:8px;
+  padding:10px 12px;
+  text-align:left;
+  background:#fff;
+  cursor:pointer;
+}
+.member-card:hover{ background:var(--orange-50); }
+
+.member-card__row{ display:flex; align-items:center; gap:8px; }
+.member-card__main{ flex:1; }
+.member-card__name{ font-weight:600; }
+.member-card__meta{ font-size:12px; color:var(--gray-500); }
+.member-card__date{ font-size:12px; color:var(--gray-700); }
+
+/* ------------------------------
+   Patient header + meta (second screen)
+------------------------------ */
+.patient-wrap{ max-width:980px; margin:0 auto; }
+.patient-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:8px;
+}
+.patient-name{ font-weight:600; font-size:18px; }
+.patient-meta{
+  font-size:14px;
+  display:grid;
+  gap:4px;
+  margin-bottom:16px;
+}
+
+.subhead{
+  font-size:14px;
+  font-weight:600;
+  margin:8px 0;
+}
+
+/* Past records list */
+.record-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.record-item{
+  width:100%;
+  text-align:left;
+  border:1px solid var(--gray-200);
+  border-radius:8px;
+  padding:10px 12px;
+  background:#fff;
+  cursor:pointer;
+}
+.record-item:hover{ background:var(--orange-50); }
+.record-item__title{ font-weight:700; font-size:18px; } /* bold date like screenshot */
+.record-item__meta{ font-size:12px; color:var(--gray-500); margin-top:2px; }
+
+.actions{ display:flex; gap:12px; margin-top:16px; }
+.actions--back{ margin-top:16px; }
+
+/* ------------------------------
+   Forms / fields (new record)
+------------------------------ */
+.form{
+  background:var(--orange-50);
+  border:1px solid var(--orange-300);
+  border-radius:12px;
+  padding:20px;
+}
+.form--new-record{ /* keeps class name explicit for this form */ }
+
+.row{ display:grid; gap:16px; margin-bottom:16px; }
+.row--two{ grid-template-columns:1fr; }
+@media (min-width:768px){ .row--two{ grid-template-columns:1fr 1fr; } }
+
+.field{ display:block; }
+.field--compact{ margin-top:12px; max-width:320px; }
+
+.label{
+  display:block;
+  font-size:14px;
+  margin-bottom:6px;
+}
+
+.input, .textarea{
+  width:100%;
+  border:1px solid var(--gray-300);
+  border-radius:6px;
+  padding:8px 12px;
+  background:#fff;
+  font: inherit;
+}
+.input--readonly{ background:var(--gray-100); }
+.input--one-third{ width:100%; max-width:240px; }
+
+.has-error{ border-color:var(--red-400) !important; } /* red border on invalid */
+.textarea{ min-height:120px; resize:vertical; }
+
+/* Checkbox */
+.checkbox{ display:flex; align-items:center; gap:8px; font-size:14px; margin-top:8px; }
+.checkbox-input{ accent-color: var(--orange-500); }
+.checkbox-label{}
+
+/* ------------------------------
+   Buttons
+------------------------------ */
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:8px 12px;
+  border-radius:8px;
+  border:1px solid transparent;
+  cursor:pointer;
+  font: inherit;
+}
+.btn:disabled{ opacity:.6; cursor:not-allowed; }
+
+.btn--primary{
+  background:var(--orange-500);
+  color:#fff;
+  border-color:var(--orange-600);
+}
+.btn--primary:hover:not(:disabled){ background:var(--orange-600); }
+
+.btn--secondary{
+  background:var(--gray-200);
+  color:#111827;
+}
+.btn--secondary:hover{ background:var(--gray-300); }
+
+/* green "+ New Record" like your screenshot */
+.btn--accent{
+  background:var(--green-200);
+  color:#065f46;
+  border-color:#34d399;
+  padding:6px 10px;
+  border-radius:6px;
+}
+.btn--accent:hover{ background:var(--green-300); }
+
+/* wide orange bars for "View Chart" / "View Documents" */
+.btn--accent-block{
+  width:100%;
+  background:var(--orange-300);
+  color:#fff;
+}
+.btn--accent-block:hover{ background:var(--orange-400); }
+
+/* small pale orange Back buttons inside subviews */
+.btn--light{
+  background:var(--orange-200);
+  color:#7c2d12;
+  border-color:var(--orange-300);
+  padding:6px 10px;
+  border-radius:6px;
+}
+.btn--light:hover{ background:var(--orange-300); }
+
+/* ------------------------------
+   Past record subviews
+------------------------------ */
+.past{ max-width:820px; margin:0 auto; }
+.past-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.past-meta{
+  margin-top:12px;
+  font-size:14px;
+}
+.past-actions{
+  margin-top:24px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+/* Chart cards */
+.grid{ display:grid; gap:16px; }
+.grid--two{ grid-template-columns:1fr; }
+@media (min-width:768px){ .grid--two{ grid-template-columns:1fr 1fr; } }
+
+.card{
+  border:1px solid var(--gray-200);
+  border-radius:8px;
+  padding:12px;
+  background:#fff;
+}
+.card__title{ font-weight:600; margin-bottom:8px; }
+.prewrap{ white-space:pre-wrap; }
+
+/* Documents panel */
+.docs-panel{
+  margin-top:12px;
+  border:1px solid var(--orange-300);
+  border-radius:8px;
+  padding:16px;
+  background:var(--orange-50);
+}
+.docs-list{ display:flex; flex-direction:column; gap:12px; }
+.doc-row{
+  border:1px solid var(--gray-200);
+  border-radius:8px;
+  padding:8px 12px;
+  background:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.doc-row__title{ font-weight:700; text-transform:uppercase; }
+.doc-row__meta{ text-transform:none; color:var(--gray-500); font-size:12px; margin-left:6px; }
+.doc-row__link{ font-size:12px; }

@@ -3,17 +3,21 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import useFormPersist from "../hooks/useFormPersist";
 import { supabase } from "../lib/supabase";
-
-/* ---------------------------------------------------------- */
-/*                  BHW DASHBOARD (Supabase)                  */
-/* ---------------------------------------------------------- */
+import "./BHWDashboard.css";
+/* ----------------------------------------------------------
+   BHW DASHBOARD (Supabase)
+   NOTE FOR CSS:
+   - Add your styles in an external stylesheet.
+   - Classnames here are semantic and stable for styling.
+   - Keep error text ('.error-text') red.
+---------------------------------------------------------- */
 
 export default function BhwDashboard() {
   const nav = useNavigate();
   const [tab, setTab] = useState("Patient Registration");
   const [loadingRole, setLoadingRole] = useState(true);
 
-  // Role guard via Supabase Auth + profiles
+  // Role guard via Supabase Auth + profiles (UNCHANGED)
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -42,23 +46,28 @@ export default function BhwDashboard() {
   if (loadingRole) return null;
 
   return (
-    <div className="min-h-screen flex">
-      <header className="fixed top-0 left-0 right-0 h-12 bg-orange-500 text-white flex items-center justify-between px-4 z-40">
-        <div className="font-semibold">Caybiga Health Center</div>
-        <button onClick={logout} className="text-sm hover:opacity-90">Log Out</button>
+    <div className="app app--bhw"> {/* CSS: page root layout container */}
+      <header className="app-header">
+        {/* CSS: .app-header -> fixed top bar; brand left, action right */}
+        <div className="brand">Caybiga Health Center</div>
+        <button onClick={logout} className="btn btn--link btn--logout">
+          {/* CSS NAME for this button: .btn--logout */}
+          Log Out
+        </button>
       </header>
 
-      <aside className="w-64 bg-orange-100 border-r border-orange-200 pt-16 p-3 min-h-screen">
-        <nav className="space-y-3">
+      <aside className="sidebar">
+        {/* CSS: vertical nav; padded top to account for fixed header */}
+        <nav className="sidebar-nav">
           {["Patient Registration", "Patient Records"].map((item) => (
             <button
               key={item}
               onClick={() => setTab(item)}
-              className={`w-full text-left px-3 py-2 rounded border ${
-                tab === item
-                  ? "bg-white border-orange-400 text-orange-700"
-                  : "bg-white hover:bg-orange-50 border-orange-200"
-              }`}
+              className={`tab-btn ${tab === item ? "tab-btn--active" : ""}`}
+              /* CSS:
+                 .tab-btn          -> base style for nav buttons
+                 .tab-btn--active  -> highlights active tab
+              */
             >
               {item}
             </button>
@@ -66,7 +75,8 @@ export default function BhwDashboard() {
         </nav>
       </aside>
 
-      <main className="flex-1 pt-16 p-6 bg-white">
+      <main className="main">
+        {/* CSS: main content area with top padding for fixed header */}
         {tab === "Patient Registration" ? <PatientRegistration /> : <PatientRecords />}
       </main>
     </div>
@@ -91,11 +101,9 @@ function PatientRegistration() {
   // Cap date inputs to today
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // ---------- LIVE VALIDATIONS ----------
-  // Letters-only (no numbers / special chars). Allow spaces.
+  // ---------- LIVE VALIDATIONS (UNCHANGED LOGIC) ----------
   const lettersOnlyBad = (s) => /[^A-Za-z\s]/.test(s || "");
 
-  // Numbers-only (no letters/spaces) for Family Number
   const familyNumberError = useMemo(() => {
     if (!form.familyNumber) return "";
     return /[^0-9]/.test(form.familyNumber) ? "Numbers only." : "";
@@ -116,7 +124,6 @@ function PatientRegistration() {
     return lettersOnlyBad(form.middleName) ? "Letters and spaces only." : "";
   }, [form.middleName]);
 
-  // Birthdate (future/invalid)
   const birthdateError = useMemo(() => {
     if (!form.birthdate) return "";
     const bd = new Date(form.birthdate);
@@ -127,19 +134,16 @@ function PatientRegistration() {
     return "";
   }, [form.birthdate]);
 
-  // Infant months + derived years from birthdate
   const { infantMonths, isInfant, birthdateYears } = useMemo(() => {
     if (!form.birthdate) return { infantMonths: 0, isInfant: false, birthdateYears: null };
     const bd = new Date(form.birthdate);
     if (isNaN(bd)) return { infantMonths: 0, isInfant: false, birthdateYears: null };
     const t = new Date();
 
-    // years
     let years = t.getFullYear() - bd.getFullYear();
     const mDelta = t.getMonth() - bd.getMonth();
     if (mDelta < 0 || (mDelta === 0 && t.getDate() < bd.getDate())) years--;
 
-    // months
     let months = (t.getFullYear() - bd.getFullYear()) * 12 + (t.getMonth() - bd.getMonth());
     if (t.getDate() < bd.getDate()) months--;
     months = Math.max(0, months);
@@ -147,7 +151,6 @@ function PatientRegistration() {
     return { infantMonths: months, isInfant: months < 12, birthdateYears: Math.max(0, years) };
   }, [form.birthdate]);
 
-  // Live error for typed Age
   const ageError = useMemo(() => {
     if (form.age === "" || form.age === null || form.age === undefined) return "";
     const n = Number(form.age);
@@ -157,7 +160,6 @@ function PatientRegistration() {
     return "";
   }, [form.age]);
 
-  // Blood Pressure: allow numbers and a single "/" only; live error on violations
   const bpError = useMemo(() => {
     if (!form.bloodPressure) return "";
     const s = String(form.bloodPressure);
@@ -168,16 +170,14 @@ function PatientRegistration() {
     return "";
   }, [form.bloodPressure]);
 
-  // Family→surname lock state
-  const [famLockSurname, setFamLockSurname] = useState(null); // string | null
+  const [famLockSurname, setFamLockSurname] = useState(null);
   const [famLookupLoading, setFamLookupLoading] = useState(false);
   const norm = (s = "") => s.trim().toUpperCase();
 
   const set = (k, v) => setField(k, v);
 
-  // ----- VALIDATION (submit-time) -----
+  // ----- VALIDATION (submit-time) (UNCHANGED LOGIC) -----
   const validate = () => {
-    // required
     if (!form.familyNumber.trim()) return "Family Number is required.";
     if (!form.surname.trim()) return "Surname is required.";
     if (!form.firstName.trim()) return "First Name is required.";
@@ -185,29 +185,24 @@ function PatientRegistration() {
     if (!form.birthdate) return "Birthdate is required.";
     if (!form.age) return "Age is required.";
 
-    // checks
     if (/[^0-9]/.test(form.familyNumber)) return "Family Number must contain numbers only.";
     if (lettersOnlyBad(form.surname)) return "Surname must contain letters and spaces only.";
     if (lettersOnlyBad(form.firstName)) return "First Name must contain letters and spaces only.";
     if (form.middleName && lettersOnlyBad(form.middleName)) return "Middle Name must contain letters and spaces only.";
 
-    // Birthdate rules
     const bd = new Date(form.birthdate);
     const today = new Date();
     today.setHours(0,0,0,0);
     if (isNaN(bd.getTime())) return "Birthdate is invalid.";
     if (bd > today) return "Birthdate cannot be in the future.";
 
-    // Age caps
     if (Number(form.age) > 120) return "Age must not exceed 120.";
     if (birthdateYears !== null && birthdateYears > 120) return "Birthdate implies age over 120.";
 
-    // Family number lock
     if (famLockSurname && norm(form.surname) !== norm(famLockSurname)) {
       return `Family Number is already assigned to surname "${famLockSurname}". Please use that surname or choose a different Family Number.`;
     }
 
-    // Contacts
     if (form.contactNumber && String(form.contactNumber).length !== 11)
       return "Contact Number must be exactly 11 digits.";
     if (form.contactPerson && String(form.contactPerson).length !== 11)
@@ -218,7 +213,6 @@ function PatientRegistration() {
     if (form.weightKg && !oneDec.test(form.weightKg)) return "Weight must have at most 1 decimal place.";
     if (form.temperatureC && !oneDec.test(form.temperatureC)) return "Temperature must have at most 1 decimal place.";
 
-    // BP format final check
     if (form.bloodPressure) {
       const s = String(form.bloodPressure);
       const slashCount = (s.match(/\//g) || []).length;
@@ -239,7 +233,6 @@ function PatientRegistration() {
     const err = validate();
     if (err) { alert(err); return; }
 
-    // Confirm missing middle name
     if (!form.middleName.trim()) {
       const okMiddle = window.confirm(
         "Are you sure this patient does not have any middle name?"
@@ -255,7 +248,7 @@ function PatientRegistration() {
     await submit();
   };
 
-  // Insert into public.patients (RLS + trigger will set created_by)
+  // Insert into public.patients (UNCHANGED)
   const submit = async () => {
     if (saving) return;
     const err = validate();
@@ -265,11 +258,10 @@ function PatientRegistration() {
     setNote(null);
 
     try {
-      // Map UI select (MALE/FEMALE/OTHER) to DB check (MEN/WOMEN/OTHER)
       const sexForDb =
         form.sex === "MALE" ? "MEN" :
         form.sex === "FEMALE" ? "WOMEN" :
-        form.sex; // OTHER stays OTHER
+        form.sex;
 
       const payload = {
         family_number: form.familyNumber.trim(),
@@ -348,7 +340,7 @@ function PatientRegistration() {
     }
   };
 
-  // Auto-age from birthdate (in whole years)
+  // Auto-age from birthdate (UNCHANGED)
   useEffect(() => {
     if (!form.birthdate) return;
     const b = new Date(form.birthdate);
@@ -361,7 +353,7 @@ function PatientRegistration() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.birthdate]);
 
-  // Lookup canonical surname for the entered family number (exact match)
+  // Family number -> surname lock (UNCHANGED)
   useEffect(() => {
     const fn = form.familyNumber.trim();
     if (!fn) { setFamLockSurname(null); return; }
@@ -398,10 +390,18 @@ function PatientRegistration() {
   }, [form.familyNumber]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <section className="max-w-5xl mx-auto">
-      <h2 className="text-sm font-semibold text-orange-600 mb-3 text-center">Patient Registration</h2>
+    <section className="section section--registration">
+      {/* CSS: center section width, vertical spacing */}
+      <h2 className="section-title">Patient Registration</h2>
 
-      <form onSubmit={handleSubmitClick} className="bg-orange-50 rounded-xl border border-orange-200 p-6 space-y-5" autoComplete="off" aria-busy={saving}>
+      <form
+        onSubmit={handleSubmitClick}
+        className="form form--patient-registration"
+        autoComplete="off"
+        aria-busy={saving}
+      >
+        {/* CSS: .form--patient-registration is the name of this form */}
+
         <Row two>
           <Field
             label="Family Number"
@@ -423,12 +423,13 @@ function PatientRegistration() {
               error={surnameError}
             />
             {famLockSurname && (
-              <div className="text-xs text-orange-700 mt-1">
-                This Family Number is linked to <span className="font-semibold">"{famLockSurname}"</span>. Surname is locked.
+              <div className="hint hint--lock">
+                {/* CSS: subtle info text */}
+                This Family Number is linked to <span className="hint-strong">"{famLockSurname}"</span>. Surname is locked.
               </div>
             )}
             {!famLockSurname && famLookupLoading && (
-              <div className="text-xs text-gray-500 mt-1">Checking family mapping...</div>
+              <div className="hint">Checking family mapping...</div>
             )}
           </div>
         </Row>
@@ -450,7 +451,14 @@ function PatientRegistration() {
           />
         </Row>
         <Row two>
-          <Select label="Sex" value={form.sex} onChange={v=>set("sex",v)} options={["MALE","FEMALE","OTHER"]} required hideAsterisk />
+          <Select
+            label="Sex"
+            value={form.sex}
+            onChange={v=>set("sex",v)}
+            options={["MALE","FEMALE","OTHER"]}
+            required
+            hideAsterisk
+          />
           <Field
             label="Birthdate"
             type="date"
@@ -475,11 +483,18 @@ function PatientRegistration() {
             max={120}
             error={ageError}
           />
-          <Field label="Contact Number" value={form.contactNumber} setValue={v=>set("contactNumber",v)} digitsOnly digitsOnlyExact={11} />
+          <Field
+            label="Contact Number"
+            value={form.contactNumber}
+            setValue={v=>set("contactNumber",v)}
+            digitsOnly
+            digitsOnlyExact={11}
+          />
         </Row>
 
         {isInfant && (
-          <div className="text-xs text-gray-600 -mt-2 mb-2">
+          <div className="note note--info note--compact">
+            {/* CSS: small muted text */}
             Age based on birthdate: {infantMonths} month{infantMonths === 1 ? "" : "s"}
           </div>
         )}
@@ -491,11 +506,24 @@ function PatientRegistration() {
           digitsOnly
           digitsOnlyExact={11}
         />
-        <hr className="border-orange-200" />
+
+        <div className="separator" /> {/* CSS: horizontal rule substitute */}
 
         <Row two>
-          <Field label="Height (cm)" value={form.heightCm} setValue={v=>set("heightCm",v)} oneDecimal placeholder="e.g. 172.4" />
-          <Field label="Weight (kg)" value={form.weightKg} setValue={v=>set("weightKg",v)} oneDecimal placeholder="e.g. 83.0" />
+          <Field
+            label="Height (cm)"
+            value={form.heightCm}
+            setValue={v=>set("heightCm",v)}
+            oneDecimal
+            placeholder="e.g. 172.4"
+          />
+          <Field
+            label="Weight (kg)"
+            value={form.weightKg}
+            setValue={v=>set("weightKg",v)}
+            oneDecimal
+            placeholder="e.g. 83.0"
+          />
         </Row>
         <Row two>
           <Field
@@ -505,29 +533,42 @@ function PatientRegistration() {
             placeholder="e.g. 120/80"
             error={bpError}
           />
-          <Field label="Temperature (°C)" value={form.temperatureC} setValue={v=>set("temperatureC",v)} oneDecimal placeholder="e.g. 37.5" />
+          <Field
+            label="Temperature (°C)"
+            value={form.temperatureC}
+            setValue={v=>set("temperatureC",v)}
+            oneDecimal
+            placeholder="e.g. 37.5"
+          />
         </Row>
 
-        <div>
-          <label className="block text-sm mb-1">Chief Complaint:</label>
-          <textarea className="w-full border rounded px-3 py-2 min-h-[120px] bg-white"
-            value={form.chiefComplaint} onChange={e=>set("chiefComplaint", e.target.value)}
-            autoComplete="off" spellCheck={false} />
+        <div className="field-group">
+          {/* CSS: block for textarea */}
+          <label className="label">Chief Complaint:</label>
+          <textarea
+            className="textarea"
+            value={form.chiefComplaint}
+            onChange={e=>set("chiefComplaint", e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
         </div>
-        <label className="flex items-center gap-2 text-sm">
+
+        <label className="checkbox">
           <input
             type="checkbox"
-            className="accent-orange-500"
+            className="checkbox-input"
             checked={form.proceedToQueue}
             onChange={e=>set("proceedToQueue", e.target.checked)}
             required
           />
-          Proceed to Queuing
+          <span className="checkbox-label">Proceed to Queuing</span>
+          {/* CSS: this checkbox must be visibly required */}
         </label>
 
         <button
           type="submit"
-          className="w-full bg-orange-500 text-white rounded-lg py-2 hover:bg-orange-600 disabled:opacity-60"
+          className="btn btn--primary btn--submit"
           disabled={saving || !canSubmit}
           title={!canSubmit ? "Complete required fields to enable submit" : ""}
         >
@@ -535,9 +576,8 @@ function PatientRegistration() {
         </button>
 
         {note && (
-          <div className={`mt-3 text-sm p-2 rounded ${
-            note.type === "success" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-          }`}>
+          <div className={`note ${note.type === "success" ? "note--success" : "note--error"}`}>
+            {/* Keep error text red via .note--error */}
             {note.msg}
           </div>
         )}
@@ -546,8 +586,16 @@ function PatientRegistration() {
   );
 }
 
+/* ---------------- LAYOUT HELPERS (STRUCTURE ONLY) ---------------- */
+
 const Row = ({two=false, children}) => (
-  <div className={`grid gap-4 ${two?"grid-cols-1 md:grid-cols-2":""}`}>{children}</div>
+  <div className={`row ${two ? "row--two" : ""}`}>
+    {/* CSS:
+       .row         -> vertical spacing between fields
+       .row--two    -> 2-column grid on wider screens, 1-col on mobile
+    */}
+    {children}
+  </div>
 );
 
 function Field({
@@ -559,13 +607,13 @@ function Field({
   step,
   required = false,
   digitsOnly = false,
-  digitsOnlyExact,       // exact digit length (e.g., 11)
-  oneDecimal = false,    // allow at most 1 decimal place
+  digitsOnlyExact,
+  oneDecimal = false,
   disabled = false,
-  min,                   // pass-through for inputs like date/number
-  max,                   // pass-through for inputs like date/number
-  error = "",            // live error message string
-  hideAsterisk = false,  // NEW: allow hiding the visual star while keeping required
+  min,
+  max,
+  error = "",
+  hideAsterisk = false,
 }) {
   const onlyDigits = (s) => s.replace(/\D+/g, "");
 
@@ -604,14 +652,13 @@ function Field({
   const hasError = !!error || showLenError;
 
   return (
-    <div>
-      <label className="block text-sm mb-1">
-        {label}{required && !hideAsterisk && <span className="text-red-500"> *</span>}:
+    <div className="field">
+      {/* CSS: .field is the container; stack label + input + messages */}
+      <label className="label">
+        {label}{required && !hideAsterisk && <span className="required-asterisk"> *</span>}:
       </label>
       <input
-        className={`w-full border rounded px-3 py-2 bg-white ${
-          disabled ? "opacity-70 cursor-not-allowed bg-gray-50" : ""
-        } ${hasError ? "border-red-400" : ""}`}
+        className={`input ${disabled ? "is-disabled" : ""} ${hasError ? "has-error" : ""}`}
         type={(digitsOnly || oneDecimal) ? "text" : type}
         inputMode={oneDecimal ? "decimal" : (digitsOnly ? "numeric" : undefined)}
         pattern={oneDecimal ? "^\\d+(\\.\\d)?$" : (exactLen ? `\\d{${exactLen}}` : (digitsOnly ? "\\d*" : undefined))}
@@ -636,12 +683,16 @@ function Field({
         }
       />
       {showLenError && (
-        <div className="text-xs text-red-600 mt-1">
+        <div className="error-text">
+          {/* CSS: keep this red */}
           Must be exactly {exactLen} digits.
         </div>
       )}
       {!!error && (
-        <div className="text-xs text-red-600 mt-1">{error}</div>
+        <div className="error-text">
+          {/* CSS: keep this red */}
+          {error}
+        </div>
       )}
     </div>
   );
@@ -649,13 +700,14 @@ function Field({
 
 function Select({ label, value, onChange, options, required = false, hideAsterisk = false }) {
   return (
-    <div>
-      <label className="block text-sm mb-1">
-        {label}{required && !hideAsterisk && <span className="text-red-500"> *</span>}:
+    <div className="field">
+      <label className="label">
+        {label}{required && !hideAsterisk && <span className="required-asterisk"> *</span>}:
       </label>
-      <div className="relative">
+      <div className="select">
+        {/* CSS: style the wrapper; add custom arrow using .select-caret if desired */}
         <select
-          className="w-full border rounded px-3 py-2 appearance-none bg-white"
+          className="select-input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           required={required}
@@ -665,9 +717,8 @@ function Select({ label, value, onChange, options, required = false, hideAsteris
             <option key={o} value={o}>{o}</option>
           ))}
         </select>
-        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-          v
-        </div>
+        <span className="select-caret">v</span>
+        {/* CSS: position this caret on the right inside select */}
       </div>
     </div>
   );
@@ -697,7 +748,6 @@ function PatientRecords() {
       setLoading(true);
       setErr("");
 
-      // Distinct families from patients; search by family_number or surname
       const like = q.trim();
       let query = supabase
         .from("patients")
@@ -729,45 +779,50 @@ function PatientRecords() {
   }
 
   return (
-    <section className="max-w-5xl mx-auto w-full">
-      <h2 className="text-sm font-semibold text-orange-600 mb-3 text-center">
-        Patient Records
-      </h2>
+    <section className="section section--records">
+      {/* CSS: center section width */}
+      <h2 className="section-title">Patient Records</h2>
 
-      <div className="flex items-center gap-3 mb-4">
+      <div className="toolbar">
+        {/* CSS: horizontal layout for search + button */}
         <input
-          className="flex-1 border rounded px-3 py-2"
+          className="input input--search"
           placeholder="Search by Family No. or Surname..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoComplete="off"
         />
         <button
-          className="border rounded px-3 py-2 hover:bg-gray-50"
+          className="btn btn--secondary"
           onClick={() => void load()}
           disabled={loading}
         >
+          {/* CSS NAME for this button: .btn--secondary */}
           {loading ? "Loading..." : "Refresh"}
         </button>
       </div>
 
       {err && (
-        <div className="text-sm bg-red-100 text-red-700 p-2 rounded mb-3">{err}</div>
+        <div className="alert alert--error">{err}</div>
+        /* CSS: .alert--error should be red background with red/dark text */
       )}
 
-      <div className="max-w-3xl mx-auto mt-2 space-y-2">
+      <div className="family-list">
+        {/* CSS: vertical list; center items on narrow screens */}
         {items.map((row) => (
           <Link
             key={`${row.family_number}-${row.surname}`}
             to={`/bhw/family/${encodeURIComponent(row.family_number)}`}
-            className="block w-[420px] sm:w-[460px] mx-auto border border-gray-600 rounded px-3 py-2 text-center text-base hover:bg-orange-50"
+            className="family-list__item"
+            /* CSS NAME for these items: .family-list__item */
           >
             {row.family_number} - {row.surname}
           </Link>
         ))}
 
         {items.length === 0 && !loading && (
-          <div className="text-center text-sm text-gray-500">No families found.</div>
+          <div className="empty">No families found.</div>
+          /* CSS: muted, centered small text */
         )}
       </div>
     </section>

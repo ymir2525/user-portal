@@ -1,0 +1,80 @@
+
+.text-center { text-align: center; }
+.app { min-height: 100vh; display: flex; }
+   .app-header { position: fixed; top:0; left:0; right:0; height:48px;
+                 display:flex; align-items:center; justify-content:space-between;
+                 padding:0 16px; background:#f97316; color:#fff; z-index:40; }
+   .brand { font-weight:600; }
+   .sidebar { width:256px; background:#fff3e6; border-right:1px solid #fdba74;
+              padding:64px 12px 16px; /* top padding to clear header */ min-height:100vh; }
+   .sidebar-nav { display:flex; flex-direction:column; gap:12px; }
+   .tab-btn { width:100%; text-align:left; padding:8px 12px; border:1px solid #fcd7b6; border-radius:6px; background:#fff; cursor:pointer; }
+   .tab-btn:hover { background:#fff7ed; }
+   .tab-btn--active { border-color:#fb923c; color:#c2410c; background:#fff; }
+   .main { flex:1; padding:64px 24px 24px; background:#fff; }
+
+ 
+   .section { max-width:1024px; margin:0 auto; }
+   .section-title { font-size:14px; font-weight:600; color:#c2410c; margin-bottom:12px; text-align:center; }
+
+
+   .form { background:#fff7ed; border:1px solid #fdba74; border-radius:12px; padding:24px; display:block; }
+   .row { display:grid; gap:16px; margin-bottom:16px; }
+   .row--two { grid-template-columns: 1fr; }
+   @media (min-width: 768px) { .row--two { grid-template-columns: 1fr 1fr; } }
+
+
+   .field { display:block; }
+   .label { display:block; font-size:14px; margin-bottom:6px; }
+   .required-asterisk { color:#ef4444; }
+   .input, .select-input, .textarea {
+     width:100%; border:1px solid #d1d5db; border-radius:6px; padding:8px 12px; background:#fff;
+   }
+   .input.is-disabled { opacity:.7; cursor:not-allowed; background:#f3f4f6; }
+   .input.has-error { border-color:#fca5a5; }
+   .textarea { min-height:120px; resize:vertical; }
+   .error-text { font-size:12px; color:#b91c1c; margin-top:4px; } /* RED validation text */
+
+
+   .hint { font-size:12px; color:#6b7280; margin-top:4px; }
+   .hint--lock { color:#9a3412; }
+   .hint-strong { font-weight:600; }
+   .note { margin-top:12px; font-size:14px; padding:8px; border-radius:6px; }
+   .note--success { background:#dcfce7; color:#166534; }
+   .note--error { background:#fee2e2; color:#991b1b; }
+   .note--info { color:#6b7280; }
+   .note--compact { margin-top:4px; font-size:12px; }
+
+
+   .btn { display:inline-flex; align-items:center; justify-content:center; border-radius:8px; padding:8px 12px; border:1px solid transparent; cursor:pointer; }
+   .btn:disabled { opacity:.6; cursor:not-allowed; }
+   .btn--link { background:transparent; color:#fff; border:none; }
+   .btn--logout { font-size:14px; }
+   .btn--primary { width:100%; background:#f97316; color:#fff; border-color:#ea580c; }
+   .btn--primary:hover:not(:disabled) { background:#ea580c; }
+   .btn--submit { margin-top:8px; }
+   .btn--secondary { background:#fff; border:1px solid #d1d5db; }
+   .btn--secondary:hover { background:#f9fafb; }
+
+
+   .checkbox { display:flex; align-items:center; gap:8px; font-size:14px; }
+   .checkbox-input { accent-color:#f97316; }
+   .checkbox-label {}
+
+ 
+   .separator { height:1px; background:#fdba74; margin:16px 0; }
+
+
+   .select { position:relative; }
+   .select-input { appearance:none; }
+   .select-caret { position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#6b7280; pointer-events:none; }
+
+
+   .toolbar { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+   .input--search {}
+   .alert { font-size:14px; padding:8px; border-radius:6px; margin-bottom:12px; }
+   .alert--error { background:#fee2e2; color:#991b1b; }
+   .family-list { max-width:720px; margin:8px auto 0; display:flex; flex-direction:column; gap:8px; align-items:center; }
+   .family-list__item { display:block; width:100%; max-width:460px; border:1px solid #4b5563; border-radius:8px; padding:8px 12px; text-align:center; text-decoration:none; color:inherit; }
+   .family-list__item:hover { background:#fff7ed; }
+   .empty { text-align:center; font-size:14px; color:#6b7280; margin-top:12px; }

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { FormArea, FormField } from "./inputs";
 import SignatureDialog from "./signaturePad/SignatureDialog"; // ← NEW
+import "./ReferralForm.css"; // ← external CSS (no Tailwind)
 
 // --- helpers ---
 function todayStr() {
@@ -120,125 +121,119 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
   const isMissing = (label) => missing.includes(label);
 
   return (
-    <div className="bg-white border rounded p-4 print:p-0">
-      <div className="flex items-center justify-between mb-3 print:hidden">
-        <div className="text-lg font-semibold">Referral Form</div>
-        <div className="space-x-2">
-          <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">
-            Back
-          </button>
-          <button
-            onClick={handleSavePdf}
-            className="px-3 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-sm"
-          >
-            Save as PDF
-          </button>
+    <div className="rf-wrap">
+      {/* Toolbar */}
+      <div className="rf-toolbar print-hide">
+        <div className="rf-toolbar__title">Referral Form</div>
+        <div className="rf-toolbar__actions">
+          <button onClick={onBack} className="btn btn--light">Back</button>
+          <button onClick={handleSavePdf} className="btn btn--primary">Save as PDF</button>
         </div>
       </div>
 
       {/* Screen form */}
       <div className="screen-only">
-        <div className="max-w-3xl mx-auto border p-6">
-          <div className="text-center font-semibold mb-4">
+        <div className="rf-form">
+          <div className="rf-title">
             <div>Caybiga Health Center</div>
             <div>REFERRAL FORM</div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid-two">
             {/* Read-only fetched fields */}
             <div>
               <ReadOnlyField label="Date" value={form.date} />
-              {isMissing("Date") && <div className="text-xs text-red-600 mt-1">Required</div>}
+              {isMissing("Date") && <div className="error-text">Required</div>}
             </div>
             <div>
               <FormField label="Receiving Hospital" value={form.receivingHospital} onChange={(v) => set("receivingHospital", v)} />
-              {isMissing("Receiving Hospital") && <div className="text-xs text-red-600 mt-1">Required</div>}
+              {isMissing("Receiving Hospital") && <div className="error-text">Required</div>}
             </div>
             <div>
               <ReadOnlyField label="Name of Patient" value={form.patientName} />
-              {isMissing("Name of Patient") && <div className="text-xs text-red-600 mt-1">Required</div>}
+              {isMissing("Name of Patient") && <div className="error-text">Required</div>}
             </div>
             <div>
               <ReadOnlyField label="Age/Sex" value={form.ageSex} />
-              {isMissing("Age/Sex") && <div className="text-xs text-red-600 mt-1">Required</div>}
+              {isMissing("Age/Sex") && <div className="error-text">Required</div>}
             </div>
             <div>
               <FormField label="Nationality" value={form.nationality} onChange={(v) => set("nationality", v)} />
-              {isMissing("Nationality") && <div className="text-xs text-red-600 mt-1">Required</div>}
+              {isMissing("Nationality") && <div className="error-text">Required</div>}
             </div>
           </div>
 
-          <div className="mt-4 text-sm grid grid-cols-4 gap-3">
+          <div className="grid-four">
             <div>
               <FormField label="BP" value={form.vs_bp} onChange={(v) => set("vs_bp", v)} />
-              {isMissing("BP") && <div className="text-xs text-red-600 mt-1">Required</div>}
+              {isMissing("BP") && <div className="error-text">Required</div>}
             </div>
             <div>
               <FormField label="PR" value={form.vs_pr} onChange={(v) => set("vs_pr", v)} />
-              {isMissing("PR") && <div className="text-xs text-red-600 mt-1">Required</div>}
+              {isMissing("PR") && <div className="error-text">Required</div>}
             </div>
             <div>
               <FormField label="RR" value={form.vs_rr} onChange={(v) => set("vs_rr", v)} />
-              {isMissing("RR") && <div className="text-xs text-red-600 mt-1">Required</div>}
+              {isMissing("RR") && <div className="error-text">Required</div>}
             </div>
             <div>
               <FormField label="Temp" value={form.vs_temp} onChange={(v) => set("vs_temp", v)} />
-              {isMissing("Temp") && <div className="text-xs text-red-600 mt-1">Required</div>}
+              {isMissing("Temp") && <div className="error-text">Required</div>}
             </div>
           </div>
 
           <div>
             <FormArea label="Pertinent History" value={form.history} onChange={(v) => set("history", v)} />
-            {isMissing("Pertinent History") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            {isMissing("Pertinent History") && <div className="error-text">Required</div>}
           </div>
           <div>
             <FormArea label="Physical Exam" value={form.pe} onChange={(v) => set("pe", v)} />
-            {isMissing("Physical Exam") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            {isMissing("Physical Exam") && <div className="error-text">Required</div>}
           </div>
           <div>
             <FormArea label="Impression/Diagnosis" value={form.impression} onChange={(v) => set("impression", v)} />
-            {isMissing("Impression/Diagnosis") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            {isMissing("Impression/Diagnosis") && <div className="error-text">Required</div>}
           </div>
           <div>
             <FormArea label="Medications Given" value={form.medsGiven} onChange={(v) => set("medsGiven", v)} />
-            {isMissing("Medications Given") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            {isMissing("Medications Given") && <div className="error-text">Required</div>}
           </div>
           <div>
             <FormArea label="Reason for Referral" value={form.reason} onChange={(v) => set("reason", v)} />
-            {isMissing("Reason for Referral") && <div className="text-xs text-red-600 mt-1">Required</div>}
+            {isMissing("Reason for Referral") && <div className="error-text">Required</div>}
           </div>
 
           {/* Printed name (kept) + capture signature (new) */}
-          <div className="mt-6 text-sm space-y-2">
+          <div className="sig-block">
             <FormField
               label="Signature over Printed Name of Referring Physician (Printed Name)"
               value={form.doctorSignature}
               onChange={(v) => set("doctorSignature", v)}
             />
             {isMissing("Physician Signature/Name") && (
-              <div className="text-xs text-red-600 mt-1">Required</div>
+              <div className="error-text">Required</div>
             )}
 
-            <div className="flex items-start gap-4">
+            <div className="sig-actions">
               <button
                 type="button"
                 onClick={() => setSigOpen(true)}
-                className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                className="btn btn--outline"
               >
                 {form.doctorSignaturePng ? "Retake Signature" : "Capture Signature"}
               </button>
 
               {form.doctorSignaturePng && (
-                <div className="flex items-center gap-3">
+                <div className="sig-preview">
                   <img
                     src={form.doctorSignaturePng}
                     alt="Physician Signature"
-                    className="max-h-20 border rounded bg-white"
+                    className="sig-img"
                   />
                   <button
                     type="button"
                     onClick={() => set("doctorSignaturePng", "")}
-                    className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                    className="btn btn--outline"
                   >
                     Clear
                   </button>
@@ -248,7 +243,7 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
 
             {/* If you made the drawn signature required */}
             {isMissing("Physician Drawn Signature") && !form.doctorSignaturePng && (
-              <div className="text-xs text-red-600">Signature is required</div>
+              <div className="error-text">Signature is required</div>
             )}
           </div>
         </div>
@@ -266,106 +261,79 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
 
       {/* Print-only version */}
       <div id="print-referral" className="print-only">
-        <div className="print-sheet">
-          <div className="print-header">
-            <div className="print-title">Caybiga Health Center</div>
-            <div className="print-sub">1 General Luis St., Caybiga Caloocan City</div>
-            <div className="print-sub">caybigastaff@gmail.com</div>
-            <div className="print-form-name">REFERRAL FORM</div>
+        <div className="ref-sheet">
+          <div className="ref-header">
+            <div className="ref-title">Caybiga Health Center</div>
+            <div className="ref-sub">1 General Luis St., Caybiga Caloocan City</div>
+            <div className="ref-sub">caybigastaff@gmail.com</div>
+            <div className="ref-form-name">REFERRAL FORM</div>
           </div>
 
-          <div className="print-row">
-            <div className="print-col"><b>Date:</b> <span className="line">{v(form.date)}</span></div>
-            <div className="print-col"><b>Receiving Hospital:</b> <span className="line">{v(form.receivingHospital)}</span></div>
+          <div className="ref-row">
+            <div className="ref-col"><b>Date:</b> <span className="line">{v(form.date)}</span></div>
+            <div className="ref-col"><b>Receiving Hospital:</b> <span className="line">{v(form.receivingHospital)}</span></div>
           </div>
 
-          <div className="print-row">
-            <div className="print-col" style={{ width: "100%" }}>
+          <div className="ref-row">
+            <div className="ref-col ref-col--full">
               <b>Name of Patient:</b> <span className="line">{v(form.patientName)}</span>
             </div>
           </div>
 
-          <div className="print-row">
-            <div className="print-col"><b>Age/Sex:</b> <span className="line">{v(form.ageSex)}</span></div>
-            <div className="print-col"><b>Nationality:</b> <span className="line">{v(form.nationality)}</span></div>
+          <div className="ref-row">
+            <div className="ref-col"><b>Age/Sex:</b> <span className="line">{v(form.ageSex)}</span></div>
+            <div className="ref-col"><b>Nationality:</b> <span className="line">{v(form.nationality)}</span></div>
           </div>
 
-          <div className="print-row">
-            <div className="print-col"><b>Vital Signs:</b> BP: <span className="line">{v(form.vs_bp)}</span></div>
-            <div className="print-col">PR: <span className="line">{v(form.vs_pr)}</span></div>
-            <div className="print-col">RR: <span className="line">{v(form.vs_rr)}</span></div>
-            <div className="print-col">Temp: <span className="line">{v(form.vs_temp)}</span></div>
+          <div className="ref-row">
+            <div className="ref-col"><b>Vital Signs:</b> BP: <span className="line">{v(form.vs_bp)}</span></div>
+            <div className="ref-col">PR: <span className="line">{v(form.vs_pr)}</span></div>
+            <div className="ref-col">RR: <span className="line">{v(form.vs_rr)}</span></div>
+            <div className="ref-col">Temp: <span className="line">{v(form.vs_temp)}</span></div>
           </div>
 
-          <div className="print-block">
+          <div className="ref-block">
             <div className="label">Pertinent History:</div>
             <div className="multiline">{v(form.history, " ")}</div>
           </div>
 
-          <div className="print-block">
+          <div className="ref-block">
             <div className="label">Physical Exam:</div>
             <div className="multiline">{v(form.pe, " ")}</div>
           </div>
 
-          <div className="print-block">
+          <div className="ref-block">
             <div className="label">Impression/Diagnosis:</div>
             <div className="multiline">{v(form.impression, " ")}</div>
           </div>
 
-          <div className="print-block">
+          <div className="ref-block">
             <div className="label">Medications Given:</div>
             <div className="multiline">{v(form.medsGiven, " ")}</div>
           </div>
 
-          <div className="print-block">
+          <div className="ref-block">
             <div className="label">Reason for Referral:</div>
             <div className="multiline">{v(form.reason, " ")}</div>
           </div>
 
-          <div className="print-sign">
+          <div className="ref-sign">
             {form.doctorSignaturePng ? (
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px" }}>
+              <div className="ref-sign__imgwrap">
                 <img
                   src={form.doctorSignaturePng}
                   alt="Physician Signature"
-                  style={{ maxHeight: "80px", maxWidth: "70%", objectFit: "contain" }}
+                  className="ref-sign__img"
                 />
               </div>
             ) : (
-              <div className="line" style={{ width: "70%" }}></div>
+              <div className="line line--wide"></div>
             )}
-            <div className="caption">Signature over Printed Name of Referring Physician</div>
-            <div className="name">{v(form.doctorSignature, " ")}</div>
+            <div className="ref-sign__caption">Signature over Printed Name of Referring Physician</div>
+            <div className="ref-sign__name">{v(form.doctorSignature, " ")}</div>
           </div>
         </div>
       </div>
-
-      <style>{`
-        .print-only { display: none; }
-        .print-sheet { font-family: Arial, sans-serif; font-size: 12px; border: 3px solid #f59e0b; padding: 16px 18px; }
-        .print-header { text-align:center; margin-bottom:10px; }
-        .print-title { font-weight:700; }
-        .print-sub { font-size:11px; color:#444; }
-        .print-form-name { margin-top:4px; font-weight:700; color:#f97316; }
-        .print-row { display:flex; gap:18px; margin:8px 0; }
-        .print-col { flex:1; min-width:0; }
-        .line { display:inline-block; min-width:120px; border-bottom:1px solid #888; padding:0 4px; }
-        .print-block { margin:12px 0; }
-        .print-block .label { font-weight:600; margin-bottom:6px; }
-        .multiline { min-height:40px; border-bottom:1px solid #999; padding-bottom:8px; white-space:pre-wrap; word-break:break-word; }
-        .print-sign { text-align:center; margin-top:16px; }
-        .print-sign .caption { font-size:11px; color:#666; margin-top:6px; }
-        .print-sign .name { margin-top:4px; }
-        @page { size: A4; margin: 12mm; }
-        @media print {
-          body * { visibility: hidden !important; }
-          header, aside { display: none !important; }
-          #print-referral, #print-referral * { visibility: visible !important; }
-          #print-referral { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-          .screen-only { display: none !important; }
-          .print-only { display: block !important; }
-        }
-      `}</style>
     </div>
   );
 }
@@ -373,13 +341,9 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
 /** Simple read-only display that looks like an input */
 function ReadOnlyField({ label, value }) {
   return (
-    <div>
-      <label className="block text-xs mb-1">{label}</label>
-      <div
-        className="w-full h-10 border rounded px-3 bg-gray-50 text-gray-600 flex items-center"
-        tabIndex={-1}
-        aria-readonly="true"
-      >
+    <div className="field">
+      <label className="field__label small">{label}</label>
+      <div className="readonly" tabIndex={-1} aria-readonly="true">
         <span className="truncate">{value || "—"}</span>
       </div>
     </div>

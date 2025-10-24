@@ -5,6 +5,7 @@ import RequireAuth from "./routes/RequireAuth";
 import BhwDashboard from "./apps/BhwDashboard";
 import BhwFamily from "./apps/BhwFamily";
 import DoctorDashboard from "./apps/DoctorDashboard";
+import AdminApp from "./apps/admin/AdminApp";
 
 export default function App() {
   return (
@@ -16,7 +17,7 @@ export default function App() {
         {/* Public */}
         <Route path="/login" element={<Login />} />
 
-        {/* Protected: BHW */}
+        {/* Protected: BHW (enum value is exactly 'BHW') */}
         <Route
           path="/bhw"
           element={
@@ -34,12 +35,22 @@ export default function App() {
           }
         />
 
-        {/* Protected: DOCTOR */}
+        {/* Protected: Doctor (enum value is 'Doctor', not 'DOCTOR') */}
         <Route
           path="/doctor"
           element={
-            <RequireAuth role="DOCTOR">
+            <RequireAuth role="Doctor">
               <DoctorDashboard />
+            </RequireAuth>
+          }
+        />
+
+        {/* Protected: Admin (enum value is 'Admin', not 'ADMIN') */}
+        <Route
+          path="/admin/*"
+          element={
+            <RequireAuth role="Admin">
+              <AdminApp />
             </RequireAuth>
           }
         />

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import SignatureDialog from "./signaturePad/SignatureDialog"; // ← NEW
+import "./MedCertForm.css"; // ← external CSS (no Tailwind)
 
 export default function MedCertForm({ active, onBack, onSavePdf }) {
   const today = () => {
@@ -146,33 +147,23 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
   };
 
   return (
-    <div className="bg-white border rounded p-4 print:p-0">
+    <div className="mc-wrap">
       {/* Toolbar (hidden on print) */}
-      <div className="flex items-center justify-between mb-3 print:hidden">
-        <div className="text-lg font-semibold">Medical Certificate</div>
-        <div className="space-x-2">
-          <button
-            onClick={onBack}
-            className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm"
-          >
-            Back
-          </button>
-          <button
-            onClick={handleSaveClick}
-            className="px-3 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-sm"
-          >
-            Save as PDF
-          </button>
+      <div className="mc-toolbar">
+        <div className="mc-toolbar__title">Medical Certificate</div>
+        <div className="mc-toolbar__actions">
+          <button onClick={onBack} className="btn btn--light">Back</button>
+          <button onClick={handleSaveClick} className="btn btn--primary">Save as PDF</button>
         </div>
       </div>
 
       {/* Screen form */}
       <div className="screen-only">
-        <div className="max-w-3xl mx-auto border p-6 space-y-4 text-sm">
+        <div className="mc-form">
           <HeaderPreview />
 
           {/* Fetched, read-only fields */}
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid-two">
             <L label="Date">
               <ReadOnlyInput value={form.date} />
             </L>
@@ -183,7 +174,7 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
             <ReadOnlyInput value={form.name} />
           </L>
 
-          <div className="grid md:grid-cols-3 gap-3">
+          <div className="grid-three">
             <L label="Age">
               <ReadOnlyInput value={form.age} />
             </L>
@@ -192,17 +183,17 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
             </L>
             <L label="Address">
               <input
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 value={form.address}
                 onChange={(e) => set("address", e.target.value)}
               />
             </L>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-3">
+          <div className="grid-three">
             <L label="Consult phrase">
               <select
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 value={form.consultVerb}
                 onChange={(e) => set("consultVerb", e.target.value)}
               >
@@ -216,7 +207,7 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
             {/* Consulted date — now manual input */}
             <L label="Consulted/Examined/Treated/Confined on (date)">
               <input
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 placeholder="MM/DD/YYYY"
                 value={form.consultedOn}
                 onChange={(e) => set("consultedOn", e.target.value)}
@@ -225,7 +216,7 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
 
             <L label="For (reason/diagnosis)">
               <input
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 value={form.reasonFor}
                 onChange={(e) => set("reasonFor", e.target.value)}
               />
@@ -234,7 +225,7 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
 
           <L label="Assessment/Impression">
             <textarea
-              className="w-full border rounded px-3 py-2 min-h-[80px]"
+              className="textarea"
               value={form.assessment}
               onChange={(e) => set("assessment", e.target.value)}
             />
@@ -242,44 +233,44 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
 
           <L label="Recommendation/s">
             <textarea
-              className="w-full border rounded px-3 py-2 min-h-[80px]"
+              className="textarea"
               value={form.recommendation}
               onChange={(e) => set("recommendation", e.target.value)}
             />
           </L>
 
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid-two">
             <L label="Physician Name (manual)">
               <input
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 value={form.doctorName}
                 onChange={(e) => set("doctorName", e.target.value)}
               />
               {/* --- Signature capture lives directly under Physician Name --- */}
-              <div className="mt-2">
-                <div className="text-xs text-slate-600 mb-1">
+              <div className="sig-capture">
+                <div className="sig-caption-screen">
                   Capture physician’s handwritten signature (prints above the name)
                 </div>
-                <div className="flex items-start gap-4">
+                <div className="sig-actions">
                   <button
                     type="button"
                     onClick={() => setSigOpen(true)}
-                    className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                    className="btn btn--outline"
                   >
                     {form.doctorSignaturePng ? "Retake Signature" : "Capture Signature"}
                   </button>
 
                   {form.doctorSignaturePng && (
-                    <div className="flex items-center gap-3">
+                    <div className="sig-preview">
                       <img
                         src={form.doctorSignaturePng}
                         alt="Physician Signature"
-                        className="max-h-20 border rounded bg-white"
+                        className="sig-img"
                       />
                       <button
                         type="button"
                         onClick={() => set("doctorSignaturePng", "")}
-                        className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                        className="btn btn--outline"
                       >
                         Clear
                       </button>
@@ -291,7 +282,7 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
 
             <L label="License No.">
               <input
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 value={form.licenseNo}
                 onChange={(e) => set("licenseNo", e.target.value)}
               />
@@ -345,11 +336,11 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
 
             <div className="mc-sign">
               {v(form.doctorSignaturePng) ? (
-                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
+                <div className="sig-print-imgwrap">
                   <img
                     src={form.doctorSignaturePng}
                     alt="Physician Signature"
-                    style={{ maxHeight: "80px", maxWidth: "70%", objectFit: "contain" }}
+                    className="sig-print-img"
                   />
                 </div>
               ) : null}
@@ -364,61 +355,6 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
         </div>
       </div>
 
-      <style>{`
-        .print-only { display: none; }
-        .screen-only { display: block; }
-
-        .mc-sheet { font-family: "Times New Roman", Georgia, serif; font-size: 12.5px; padding: 18px 22px 14px; position: relative; }
-        .mc-top-border, .mc-bottom-border { height: 4px; background: #f59e0b; width: 100%; }
-        .mc-top-border { position: absolute; left: 0; top: 0; }
-        .mc-bottom-border { position: absolute; left: 0; bottom: 0; }
-        .mc-header { text-align: center; margin-top: 6px; margin-bottom: 6px; }
-        .mc-clinic { font-weight: 700; color: #e76f00; }
-        .mc-sub { color: #333; font-size: 11.5px; line-height: 1.1; }
-        .mc-date { text-align: right; margin-top: 8px; margin-bottom: 6px; }
-        .mc-title { text-align: center; font-weight: 700; margin: 10px 0 12px; }
-        .mc-body { margin-top: 4px; }
-        .mc-par { margin: 10px 0; line-height: 1.6; }
-        .mc-par.center { text-align: center; }
-        .mc-par.small { font-size: 11.5px; }
-        .label { font-weight: 700; margin: 6px 0 4px; }
-
-        .multiline {
-          min-height: 46px;
-          padding: 6px 2px 10px;
-          white-space: pre-wrap;
-          word-break: break-word;
-          background:
-            repeating-linear-gradient(
-              to bottom,
-              transparent 0px,
-              transparent 16px,
-              #000 16px,
-              #000 17px
-            );
-        }
-        .multiline.tall { min-height: 70px; }
-
-        .line { display: inline-block; border-bottom: 1px solid #000; min-width: 140px; margin: 0 6px 2px 6px; }
-        .line.lg { min-width: 220px; }
-        .line.sm { min-width: 110px; }
-        .line.xs { min-width: 60px; }
-        .nowrap { white-space: nowrap; }
-        .mc-sign { margin-top: 24px; text-align: right; }
-        .sig-name { display: inline-block; border-top: 1px solid #000; padding-top: 3px; min-width: 260px; text-align: center; font-weight: 700; }
-        .sig-caption { margin-top: 6px; }
-
-        @page { size: A4; margin: 12mm; }
-        @media print {
-          body * { visibility: hidden !important; }
-          header, aside { display: none !important; }
-          #print-medcert, #print-medcert * { visibility: visible !important; }
-          #print-medcert { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-          .screen-only { display: none !important; }
-          .print-only { display: block !important; }
-        }
-      `}</style>
-
       {/* Signature modal */}
       <SignatureDialog
         open={sigOpen}
@@ -426,7 +362,7 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
         initialValue={form.doctorSignaturePng}
         onDone={(png) => set("doctorSignaturePng", png)}
         title="Physician Signature"
-        heightClass="h-56"
+        heightClass="h-56" /* keep prop; the dialog handles it internally */
       />
     </div>
   );
@@ -434,18 +370,18 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
 
 function HeaderPreview() {
   return (
-    <div className="text-center">
-      <div className="font-bold text-orange-600">Caybiga Health Center</div>
-      <div className="text-xs">1 General Luis St., Caybiga Caloocan City</div>
-      <div className="text-xs">caybigastellite@gmail.com</div>
+    <div className="mc-headerpreview">
+      <div className="mc-headerpreview__title">Caybiga Health Center</div>
+      <div className="mc-headerpreview__sub">1 General Luis St., Caybiga Caloocan City</div>
+      <div className="mc-headerpreview__sub">caybigastellite@gmail.com</div>
     </div>
   );
 }
 
 function L({ label, children }) {
   return (
-    <label className="block">
-      <div className="text-xs font-semibold mb-1">{label}</div>
+    <label className="field">
+      <div className="field__label">{label}</div>
       {children}
     </label>
   );
@@ -454,11 +390,7 @@ function L({ label, children }) {
 /** Read-only UI that looks like an input */
 function ReadOnlyInput({ value }) {
   return (
-    <div
-      className="w-full border rounded px-3 py-2 bg-gray-50 text-gray-600"
-      tabIndex={-1}
-      aria-readonly="true"
-    >
+    <div className="readonly" tabIndex={-1} aria-readonly="true">
       {value || ""}
     </div>
   );

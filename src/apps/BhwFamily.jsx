@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { dateOnly } from "../lib/utils";
 import { supabase } from "../lib/supabase";
-
+import "./BhwFamily.css";
 export default function BhwFamily() {
   const { familyNumber } = useParams();
   const nav = useNavigate();
@@ -238,69 +238,72 @@ export default function BhwFamily() {
   }, [patient]);
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="family-page"> {/* CSS: page wrapper for spacing */}
       {/* top bar: back and logout */}
-      <div className="flex items-center justify-between mb-4">
-        <Link to="/bhw" className="text-sm underline">← Back to Records</Link>
-        <button onClick={logout} className="text-sm underline">Log Out</button>
+      <div className="topbar">
+        <Link to="/bhw" className="link link--small">← Back to Records</Link>
+        <button onClick={logout} className="link link--small">Log Out</button>
       </div>
 
-      <h2 className="text-center text-orange-600 font-semibold mb-4">
+      <h2 className="page-title page-title--family">
+        {/* CSS NAME of this title: .page-title--family */}
         Family: {familyNumber}
       </h2>
 
-      {loading && <div className="text-center text-sm">Loading…</div>}
-      {err && <div className="text-center text-sm text-red-600">{err}</div>}
+      {loading && <div className="status status--loading">Loading…</div>}
+      {err && <div className="error-text text-center">{err}</div>}
 
       {!loading && !err && (
         <>
           {mode === "members" && (
-            <div className="w-full space-y-2">
+            <div className="member-list">
               {members.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => openPatient(m.id)}
-                  className="block mx-auto w-[420px] sm:w-[460px] border border-gray-600 rounded px-3 py-2 hover:bg-orange-50 text-left"
+                  className="member-card"
+                  /* CSS NAME: .member-card (clickable row button) */
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <span className="font-semibold">
+                  <div className="member-card__row">
+                    <div className="member-card__main">
+                      <span className="member-card__name">
                         {m.first_name} {m.middle_name ? `${m.middle_name} ` : ""}{m.surname}
                       </span>
-                      <span className="text-xs text-gray-600">
+                      <span className="member-card__meta">
                         {" "}• {m.sex} • {m.age} Years Old
                       </span>
                     </div>
-                    <div className="text-xs text-gray-700">{dateOnly(m.birthdate)}</div>
+                    <div className="member-card__date">{dateOnly(m.birthdate)}</div>
                   </div>
                 </button>
               ))}
 
               {members.length === 0 && (
-                <div className="text-center text-sm text-gray-500">No members found.</div>
+                <div className="empty">No members found.</div>
               )}
             </div>
           )}
 
           {mode === "patient" && patient && (
-            <div className="max-w-5xl mx-auto">
+            <div className="patient-wrap">
               {/* header with + New Record */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-semibold">
+              <div className="patient-head">
+                <div className="patient-name">
                   {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
                 </div>
                 <button
                   onClick={() => { setMode("new"); setErrors({}); setErr(""); }}
-                  className="px-3 py-1 rounded bg-green-200 hover:bg-green-300 text-sm"
+                  className="btn btn--accent"
                 >
+                  {/* CSS NAME for this button: .btn--accent */}
                   + New Record
                 </button>
               </div>
 
-              <div className="text-sm space-y-1 mb-4">
+              <div className="patient-meta">
                 <div><strong>Family Number:</strong> {patient.family_number}</div>
                 <div><strong>Sex:</strong> {patient.sex || "-"}</div>
-                <div className="text-sm"><span className="font-semibold">Birthdate:</span> {dateOnly(patient.birthdate)}</div>
+                <div><strong>Birthdate:</strong> {dateOnly(patient.birthdate)}</div>
                 <div><strong>Age:</strong> {computedAge || "-"}</div>
                 <div><strong>Contacts:</strong> {patient.contact_number || "-"}</div>
               </div>
@@ -308,21 +311,22 @@ export default function BhwFamily() {
               {/* ---------- Past Records (clickable) ---------- */}
               {pastView === "list" && (
                 <>
-                  <div className="text-sm font-semibold mb-1">Past Records</div>
-                  <div className="space-y-2">
+                  <div className="subhead">Past Records</div>
+                  <div className="record-list">
                     {records.length === 0 && (
-                      <div className="text-gray-500 text-sm">No past records found.</div>
+                      <div className="empty">No past records found.</div>
                     )}
                     {records.map(r => (
                       <button
                         key={r.id}
                         onClick={() => { setSelectedPast(r); setPastView("detail"); }}
-                        className="w-full text-left border rounded px-3 py-2 hover:bg-orange-50"
+                        className="record-item"
+                        /* CSS NAME: .record-item (row button) */
                       >
-                        <div className="font-medium">
+                        <div className="record-item__title">
                           {dateOnly(r.completed_at || r.visit_date || r.created_at)}
                         </div>
-                        <div className="text-xs text-gray-600">
+                        <div className="record-item__meta">
                           H: {r.height_cm ?? "—"} cm • W: {r.weight_kg ?? "—"} kg • BP: {r.blood_pressure ?? "—"} •
                           Temp: {r.temperature_c ?? "—"} °C • CC: {r.chief_complaint || "—"}
                         </div>
@@ -330,10 +334,10 @@ export default function BhwFamily() {
                     ))}
                   </div>
 
-                  <div className="mt-6">
+                  <div className="actions actions--back">
                     <button
                       onClick={() => setMode("members")}
-                      className="px-4 py-2 rounded bg-orange-500 text-white hover:bg-orange-600"
+                      className="btn btn--primary"
                     >
                       Back
                     </button>
@@ -372,75 +376,91 @@ export default function BhwFamily() {
           )}
 
           {mode === "new" && patient && (
-            <div className="max-w-4xl mx-auto">
-              <h3 className="text-center text-2xl font-semibold mb-4">
+            <div className="new-record">
+              <h3 className="page-title page-title--sub">
                 New Record for {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
               </h3>
 
-              <form onSubmit={submitNewRecord} className="bg-orange-50 border border-orange-200 rounded-xl p-5">
+              <form onSubmit={submitNewRecord} className="form form--new-record">
                 {/* Prefilled read-only fields */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm mb-1">Patient Name:</label>
-                    <input className="w-full border rounded px-3 py-2 bg-gray-100" readOnly
-                      value={`${patient.first_name} ${patient.middle_name ? patient.middle_name + " " : ""}${patient.surname}`} />
+                <div className="row row--two">
+                  <div className="field">
+                    <label className="label">Patient Name:</label>
+                    <input
+                      className="input input--readonly"
+                      readOnly
+                      value={`${patient.first_name} ${patient.middle_name ? patient.middle_name + " " : ""}${patient.surname}`}
+                    />
                   </div>
-                  <div>
-                    <label className="block text-sm mb-1">Family Number:</label>
-                    <input className="w-full border rounded px-3 py-2 bg-gray-100" readOnly
-                      value={patient.family_number || ""} />
+                  <div className="field">
+                    <label className="label">Family Number:</label>
+                    <input
+                      className="input input--readonly"
+                      readOnly
+                      value={patient.family_number || ""}
+                    />
                   </div>
                 </div>
 
-                <div className="mt-3">
-                  <label className="block text-sm mb-1">Age:</label>
-                  <input className="w-full md:w-1/3 border rounded px-3 py-2 bg-gray-100" readOnly
-                    value={computedAge || ""} />
+                <div className="field field--compact">
+                  <label className="label">Age:</label>
+                  <input
+                    className="input input--readonly input--one-third"
+                    readOnly
+                    value={computedAge || ""}
+                  />
                 </div>
 
-                <hr className="my-4 border-orange-200" />
+                <div className="separator" />
 
                 {/* Editable vitals */}
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="row row--two">
                   <Field label="Height (cm)" value={form.heightCm} onChange={v => setField("heightCm", v)} digitsOnly error={errors.heightCm} />
                   <Field label="Weight (kg)" value={form.weightKg} onChange={v => setField("weightKg", v)} oneDecimal placeholder="e.g. 42.7" error={errors.weightKg} />
                 </div>
-                <div className="grid md:grid-cols-2 gap-4 mt-3">
+                <div className="row row--two">
                   <Field label="Blood Pressure" value={form.bloodPressure} onChange={v => setField("bloodPressure", v)} placeholder="e.g. 120/80" error={errors.bloodPressure} />
                   <Field label="Temperature (°C)" value={form.temperatureC} onChange={v => setField("temperatureC", v)} oneDecimal placeholder="e.g. 37.5" error={errors.temperatureC} />
                 </div>
-                <div className="mt-3">
-                  <label className="block text-sm mb-1">Chief Complaint:</label>
-                  <textarea className={`w-full border rounded px-3 py-2 min-h-[120px] bg-white ${errors.chiefComplaint ? 'border-red-400' : ''}`}
-                    value={form.chiefComplaint} onChange={e => setField("chiefComplaint", e.target.value)} />
+
+                <div className="field">
+                  <label className="label">Chief Complaint:</label>
+                  <textarea
+                    className={`textarea ${errors.chiefComplaint ? 'has-error' : ''}`}
+                    value={form.chiefComplaint}
+                    onChange={e => setField("chiefComplaint", e.target.value)}
+                  />
                   {errors.chiefComplaint && (
-                    <div className="text-xs text-red-600 mt-1">{errors.chiefComplaint}</div>
+                    <div className="error-text">{errors.chiefComplaint}</div>
                   )}
                 </div>
 
-                <label className="flex items-center gap-2 text-sm mt-2">
-                  <input type="checkbox" className="accent-orange-500"
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    className="checkbox-input"
                     checked={form.proceedToQueue}
-                    onChange={e => setField("proceedToQueue", e.target.checked)} />
-                  Proceed to Queuing
+                    onChange={e => setField("proceedToQueue", e.target.checked)}
+                  />
+                  <span className="checkbox-label">Proceed to Queuing</span>
                 </label>
 
                 {errors._form && (
-                  <div className="mt-3 text-sm text-red-700">{errors._form}</div>
+                  <div className="error-text">{errors._form}</div>
                 )}
 
-                <div className="mt-4 flex gap-3">
+                <div className="actions">
                   <button
                     onClick={() => setMode("patient")}
                     type="button"
-                    className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
+                    className="btn btn--secondary"
                   >
                     Back
                   </button>
                   <button
                     type="submit"
                     disabled={saving || !canSubmit}
-                    className="px-4 py-2 rounded bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60"
+                    className="btn btn--primary"
                   >
                     {saving ? "Saving..." : "Submit"}
                   </button>
@@ -458,21 +478,21 @@ export default function BhwFamily() {
 
 function PastDetail({ rec, patient, onBack, onViewChart, onViewDocs }) {
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">{dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
-        <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">Back</button>
+    <div className="past past--detail">
+      <div className="past-head">
+        <h3 className="subhead">{dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
+        <button onClick={onBack} className="btn btn--light">Back</button>
       </div>
 
-      <div className="mt-3 text-sm space-y-1">
+      <div className="past-meta">
         <div><strong>Patient Name:</strong> {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}</div>
         <div><strong>Doctor in Charge:</strong> {rec.doctor_full_name || "—"}</div>
         <div><strong>Date:</strong> {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</div>
       </div>
 
-      <div className="mt-6 space-y-3">
-        <button onClick={onViewChart} className="w-full rounded py-2 bg-orange-300 text-white hover:bg-orange-400">View Chart</button>
-        <button onClick={onViewDocs} className="w-full rounded py-2 bg-orange-300 text-white hover:bg-orange-400">View Documents</button>
+      <div className="past-actions">
+        <button onClick={onViewChart} className="btn btn--accent-block">View Chart</button>
+        <button onClick={onViewDocs} className="btn btn--accent-block">View Documents</button>
       </div>
     </div>
   );
@@ -480,25 +500,25 @@ function PastDetail({ rec, patient, onBack, onViewChart, onViewDocs }) {
 
 function PastChartViewLite({ rec, patient, onBack }) {
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Chart – {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
-        <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">Back</button>
+    <div className="past past--chart">
+      <div className="past-head">
+        <h3 className="subhead">Chart – {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
+        <button onClick={onBack} className="btn btn--light">Back</button>
       </div>
 
-      <div className="mt-4 grid md:grid-cols-2 gap-4 text-sm">
-        <div className="border rounded p-3 bg-white">
-          <div className="font-semibold mb-2">Nurse Vitals</div>
+      <div className="grid grid--two">
+        <div className="card">
+          <div className="card__title">Nurse Vitals</div>
           <div>Height: {rec.height_cm ?? "—"} cm</div>
           <div>Weight: {rec.weight_kg ?? "—"} kg</div>
           <div>BP: {rec.blood_pressure ?? "—"}</div>
           <div>Temperature: {rec.temperature_c ?? "—"} °C</div>
           <div>Chief Complaint: {rec.chief_complaint || "—"}</div>
         </div>
-        <div className="border rounded p-3 bg-white">
-          <div className="font-semibold mb-2">Doctor’s Notes</div>
-          <div className="whitespace-pre-wrap">{rec.doctor_notes || "—"}</div>
-          <div className="mt-2 text-xs text-gray-600">Doctor: {rec.doctor_full_name || "—"}</div>
+        <div className="card">
+          <div className="card__title">Doctor’s Notes</div>
+          <div className="prewrap">{rec.doctor_notes || "—"}</div>
+          <div className="muted small">Doctor: {rec.doctor_full_name || "—"}</div>
         </div>
       </div>
     </div>
@@ -533,25 +553,25 @@ function PastDocumentsViewLite({ rec, onBack }) {
   }, [rec.id]);
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Document Request</h3>
-        <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">Back</button>
+    <div className="past past--docs">
+      <div className="past-head">
+        <h3 className="subhead">Document Request</h3>
+        <button onClick={onBack} className="btn btn--light">Back</button>
       </div>
 
-      <div className="mt-3 border rounded p-4 bg-orange-50">
-        {loading && <div className="text-sm text-gray-600">Loading…</div>}
-        {err && <div className="text-sm text-red-600">{err}</div>}
+      <div className="docs-panel">
+        {loading && <div className="status status--loading">Loading…</div>}
+        {err && <div className="error-text">{err}</div>}
         {!loading && !err && (
-          <div className="space-y-3">
-            {docs.length === 0 && <div className="text-sm text-gray-600">No documents saved for this record.</div>}
+          <div className="docs-list">
+            {docs.length === 0 && <div className="muted">No documents saved for this record.</div>}
             {docs.map(d => (
-              <div key={d.id} className="border rounded px-3 py-2 bg-white flex items-center justify-between">
-                <div className="font-semibold uppercase">
-                  {d.type} <span className="normal-case text-gray-600 text-xs">• {new Date(d.created_at).toLocaleString()}</span>
+              <div key={d.id} className="doc-row">
+                <div className="doc-row__title">
+                  {d.type} <span className="doc-row__meta">• {new Date(d.created_at).toLocaleString()}</span>
                 </div>
-                <div className="text-xs text-gray-600">
-                  {d.url ? <a className="underline" href={d.url} target="_blank" rel="noreferrer">open file</a> : "no file URL"}
+                <div className="doc-row__link">
+                  {d.url ? <a className="link" href={d.url} target="_blank" rel="noreferrer">open file</a> : "no file URL"}
                 </div>
               </div>
             ))}
@@ -599,10 +619,10 @@ function Field({
   };
 
   return (
-    <div>
-      <label className="block text-sm mb-1">{label}:</label>
+    <div className="field">
+      <label className="label">{label}:</label>
       <input
-        className={`w-full border rounded px-3 py-2 bg-white ${error ? 'border-red-400' : ''}`}
+        className={`input ${error ? 'has-error' : ''}`}
         value={value}
         onChange={handleChange}
         type={(digitsOnly || oneDecimal) ? "text" : type}
@@ -615,7 +635,7 @@ function Field({
         autoCapitalize="none"
         spellCheck={false}
       />
-      {error && <div className="text-xs text-red-600 mt-1">{error}</div>}
+      {error && <div className="error-text">{error}</div>}
     </div>
   );
 }
