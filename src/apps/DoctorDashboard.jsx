@@ -14,7 +14,9 @@ import MedCertForm from "../components/MedCertForm";
 import LabRequestForm from "../components/LabRequestForm";
 import PrescriptionForm from "../components/PrescriptionForm";
 
-// ---- helpers to compute display values ----
+import "./DoctorD.css"; // <-- external CSS (no Tailwind)
+
+/* ---- helpers to compute display values ---- */
 function ageDisplayFromBirthdate(birthdate, fallbackAge) {
   if (!birthdate) return (fallbackAge ?? "") === "" ? "—" : String(fallbackAge);
 
@@ -218,6 +220,9 @@ export default function DoctorDashboard() {
 
       if (error) throw error;
 
+      // NOTE: Do NOT touch patients.queued / patients.queued_at anymore.
+      // That way AdminDashboard's "Total Check Up (today)" never decrements.
+
       setQueue((q) => q.filter((x) => x.record_id !== active.record_id));
       setActive(null);
       setBanner({ type: "ok", msg: "Chart saved. Patient removed from queue." });
@@ -309,46 +314,44 @@ export default function DoctorDashboard() {
     : null;
 
   return (
-    <div className="min-h-screen flex">
+    <div className="docdash layout">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-12 bg-orange-500 text-white flex items-center justify-between px-4 z-40">
-        <div className="font-semibold">Caybiga Health Center</div>
-        <button onClick={logout} className="text-sm hover:opacity-90">Log Out</button>
+      <header className="app-header">
+        <div className="app-header__title">Caybiga Health Center</div>
+        <button onClick={logout} className="link link--small">Log Out</button>
       </header>
 
       {/* Queue */}
-      <aside className="w-64 bg-orange-100 border-r border-orange-200 pt-16 p-3 min-h-screen">
-        <div className="font-medium text-sm mb-2">Queue</div>
-        {loading && <div className="text-xs text-gray-600">Loading…</div>}
-        {!loading && queue.length === 0 && <div className="text-xs text-gray-500">No patients in queue.</div>}
-        <div className="space-y-2">
+      <aside className="sidebar">
+        <div className="sidebar__title">Queue</div>
+        {loading && <div className="muted small">Loading…</div>}
+        {!loading && queue.length === 0 && <div className="muted small">No patients in queue.</div>}
+        <div className="sidebar__list">
           {queue.map((q) => (
             <button
               key={q.record_id}
               onClick={() => { setActive(q); setTab("day"); setDocView("none"); }}
-              className={`w-full text-left px-3 py-2 rounded border bg-white hover:bg-orange-50 ${
-                active?.record_id === q.record_id ? "border-orange-400" : "border-orange-200"
-              }`}
+              className={`queue-item ${active?.record_id === q.record_id ? "queue-item--active" : ""}`}
             >
-              <div className="text-xs text-gray-500">{q.family_number}</div>
-              <div className="font-medium">{fullName(q)}</div>
+              <div className="queue-item__fam muted small">{q.family_number}</div>
+              <div className="queue-item__name">{fullName(q)}</div>
             </button>
           ))}
         </div>
       </aside>
 
       {/* Main */}
-      <main className="flex-1 pt-16 p-6 bg-white">
+      <main className="main">
         {/* Tabs */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="tabs">
           <button
-            className={`text-center rounded py-2 text-sm ${tab === "day" ? "bg-orange-500 text-white" : "bg-orange-100 border border-orange-200"}`}
+            className={`tab ${tab === "day" ? "tab--active" : ""}`}
             onClick={() => setTab("day")}
           >
             Day Chart
           </button>
           <button
-            className={`text-center rounded py-2 text-sm ${tab === "past" ? "bg-orange-500 text-white" : "bg-orange-100 border border-orange-200"}`}
+            className={`tab ${tab === "past" ? "tab--active" : ""}`}
             onClick={() => setTab("past")}
           >
             Past Records
@@ -356,7 +359,7 @@ export default function DoctorDashboard() {
         </div>
 
         {banner && (
-          <div className={`mb-3 text-sm p-2 rounded ${banner.type === "ok" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+          <div className={`banner ${banner.type === "ok" ? "banner--ok" : "banner--err"}`}>
             {banner.msg}
           </div>
         )}
@@ -364,16 +367,16 @@ export default function DoctorDashboard() {
         {/* DAY CHART */}
         {tab === "day" && (
           <>
-            {!active && <div className="text-sm text-gray-500 text-center">Pick a patient from the left queue.</div>}
+            {!active && <div className="muted small text-center">Pick a patient from the left queue.</div>}
 
             {active && docView === "none" && (
-              <div className="space-y-4">
+              <div className="stack">
                 <PatientHeader patient={activeWithDisplays} />
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="border rounded p-3 bg-white">
-                    <div className="font-semibold mb-2">Doctor’s Notes:</div>
+                <div className="grid-2">
+                  <div className="panel">
+                    <div className="panel__title">Doctor’s Notes:</div>
                     <textarea
-                      className="w-full min-h-[180px] border rounded px-3 py-2"
+                      className="textarea"
                       placeholder="Enter findings, assessment, and plan here…"
                       value={docNotes}
                       onChange={(e) => setDocNotes(e.target.value)}
@@ -382,18 +385,18 @@ export default function DoctorDashboard() {
                   <NurseBlock record={active} />
                 </div>
 
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <button className="underline" onClick={() => setDocView("referral")}>Referral Form</button>
-                  <button className="underline" onClick={() => setDocView("prescription")}>Prescription Sheet</button>
-                  <button className="underline" onClick={() => setDocView("lab")}>Laboratory Request</button>
-                  <button className="underline" onClick={() => setDocView("medcert")}>Medical Certificate</button>
+                <div className="inline-links">
+                  <button className="link" onClick={() => setDocView("referral")}>Referral Form</button>
+                  <button className="link" onClick={() => setDocView("prescription")}>Prescription Sheet</button>
+                  <button className="link" onClick={() => setDocView("lab")}>Laboratory Request</button>
+                  <button className="link" onClick={() => setDocView("medcert")}>Medical Certificate</button>
                 </div>
 
                 <div className="pt-1">
                   <button
                     onClick={handleSaveClick}
                     disabled={!canSave}
-                    className="w-full bg-orange-500 text-white rounded py-2 hover:bg-orange-600 disabled:opacity-60"
+                    className="btn btn--primary-wide"
                     title={!docNotes?.trim() ? "Enter Doctor’s Notes to enable saving" : ""}
                     aria-disabled={!canSave}
                   >
@@ -479,19 +482,19 @@ export default function DoctorDashboard() {
 
         {/* PAST RECORDS */}
         {tab === "past" && (
-          <div className="space-y-4">
-            {!active && <div className="text-sm text-gray-500">Select a patient from the queue first.</div>}
+          <div className="stack">
+            {!active && <div className="muted small">Select a patient from the queue first.</div>}
 
             {active && pastView === "menu" && (
-              <div className="space-y-2">
-                {loadingPast && <div className="text-sm text-gray-500">Loading…</div>}
-                {!loadingPast && past.length === 0 && <div className="text-sm text-gray-500">No past records found.</div>}
+              <div className="stack">
+                {loadingPast && <div className="muted small">Loading…</div>}
+                {!loadingPast && past.length === 0 && <div className="muted small">No past records found.</div>}
                 {past.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between border rounded px-3 py-2 bg-white hover:bg-orange-50">
-                    <button className="underline" onClick={() => { setSelectedPast(r); setPastView("detail"); }}>
+                  <div key={r.id} className="past-row">
+                    <button className="link" onClick={() => { setSelectedPast(r); setPastView("detail"); }}>
                       {fmtDate(r.completed_at || r.visit_date || r.created_at)}
                     </button>
-                    <div className="text-sm text-gray-700">{r.doctor_full_name || "—"}</div>
+                    <div className="past-row__doc small">{r.doctor_full_name || "—"}</div>
                   </div>
                 ))}
               </div>

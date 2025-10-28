@@ -3,10 +3,15 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import useFormPersist from "../hooks/useFormPersist";
 import { supabase } from "../lib/supabase";
+import "./BHWDashboard.css";
 
-/* ---------------------------------------------------------- */
-/*                  BHW DASHBOARD (Supabase)                  */
-/* ---------------------------------------------------------- */
+/* ----------------------------------------------------------
+   BHW DASHBOARD (Supabase)
+   NOTE FOR CSS:
+   - Add your styles in BHWDashboard.css (below).
+   - Classnames here are semantic and stable for styling.
+   - Keep error text ('.error-text') red.
+---------------------------------------------------------- */
 
 export default function BhwDashboard() {
   const nav = useNavigate();
@@ -42,23 +47,21 @@ export default function BhwDashboard() {
   if (loadingRole) return null;
 
   return (
-    <div className="min-h-screen flex">
-      <header className="fixed top-0 left-0 right-0 h-12 bg-orange-500 text-white flex items-center justify-between px-4 z-40">
-        <div className="font-semibold">Caybiga Health Center</div>
-        <button onClick={logout} className="text-sm hover:opacity-90">Log Out</button>
+    <div className="app app--bhw">
+      <header className="app-header">
+        <div className="brand">Caybiga Health Center</div>
+        <button onClick={logout} className="btn btn--link btn--logout">
+          Log Out
+        </button>
       </header>
 
-      <aside className="w-64 bg-orange-100 border-r border-orange-200 pt-16 p-3 min-h-screen">
-        <nav className="space-y-3">
+      <aside className="sidebar">
+        <nav className="sidebar-nav">
           {["Patient Registration", "Patient Records"].map((item) => (
             <button
               key={item}
               onClick={() => setTab(item)}
-              className={`w-full text-left px-3 py-2 rounded border ${
-                tab === item
-                  ? "bg-white border-orange-400 text-orange-700"
-                  : "bg-white hover:bg-orange-50 border-orange-200"
-              }`}
+              className={`tab-btn ${tab === item ? "tab-btn--active" : ""}`}
             >
               {item}
             </button>
@@ -66,7 +69,7 @@ export default function BhwDashboard() {
         </nav>
       </aside>
 
-      <main className="flex-1 pt-16 p-6 bg-white">
+      <main className="main">
         {tab === "Patient Registration" ? <PatientRegistration /> : <PatientRecords />}
       </main>
     </div>
@@ -77,7 +80,12 @@ export default function BhwDashboard() {
 function PatientRegistration() {
   const initialForm = {
     familyNumber:"", surname:"", firstName:"", middleName:"",
-    sex:"", birthdate:"", age:"", contactNumber:"", contactPerson:"",
+    sex:"", birthdate:"", age:"", contactNumber:"",
+    // Existing field (kept): this will be the Emergency Contact Number
+    contactPerson:"",
+    // NEW fields:
+    emergencyPersonName:"",   // Contact Person (name)
+    emergencyRelation:"",     // Relation
     heightCm:"", weightKg:"", bloodPressure:"", temperatureC:"",
     chiefComplaint:"", proceedToQueue:false
   };
@@ -92,10 +100,8 @@ function PatientRegistration() {
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   // ---------- LIVE VALIDATIONS ----------
-  // Letters-only (no numbers / special chars). Allow spaces.
   const lettersOnlyBad = (s) => /[^A-Za-z\s]/.test(s || "");
 
-  // Numbers-only (no letters/spaces) for Family Number
   const familyNumberError = useMemo(() => {
     if (!form.familyNumber) return "";
     return /[^0-9]/.test(form.familyNumber) ? "Numbers only." : "";
@@ -116,7 +122,6 @@ function PatientRegistration() {
     return lettersOnlyBad(form.middleName) ? "Letters and spaces only." : "";
   }, [form.middleName]);
 
-  // Birthdate (future/invalid)
   const birthdateError = useMemo(() => {
     if (!form.birthdate) return "";
     const bd = new Date(form.birthdate);
@@ -127,19 +132,16 @@ function PatientRegistration() {
     return "";
   }, [form.birthdate]);
 
-  // Infant months + derived years from birthdate
   const { infantMonths, isInfant, birthdateYears } = useMemo(() => {
     if (!form.birthdate) return { infantMonths: 0, isInfant: false, birthdateYears: null };
     const bd = new Date(form.birthdate);
     if (isNaN(bd)) return { infantMonths: 0, isInfant: false, birthdateYears: null };
     const t = new Date();
 
-    // years
     let years = t.getFullYear() - bd.getFullYear();
     const mDelta = t.getMonth() - bd.getMonth();
     if (mDelta < 0 || (mDelta === 0 && t.getDate() < bd.getDate())) years--;
 
-    // months
     let months = (t.getFullYear() - bd.getFullYear()) * 12 + (t.getMonth() - bd.getMonth());
     if (t.getDate() < bd.getDate()) months--;
     months = Math.max(0, months);
@@ -147,7 +149,6 @@ function PatientRegistration() {
     return { infantMonths: months, isInfant: months < 12, birthdateYears: Math.max(0, years) };
   }, [form.birthdate]);
 
-  // Live error for typed Age
   const ageError = useMemo(() => {
     if (form.age === "" || form.age === null || form.age === undefined) return "";
     const n = Number(form.age);
@@ -157,7 +158,6 @@ function PatientRegistration() {
     return "";
   }, [form.age]);
 
-  // Blood Pressure: allow numbers and a single "/" only; live error on violations
   const bpError = useMemo(() => {
     if (!form.bloodPressure) return "";
     const s = String(form.bloodPressure);
@@ -168,16 +168,24 @@ function PatientRegistration() {
     return "";
   }, [form.bloodPressure]);
 
-  // Family→surname lock state
-  const [famLockSurname, setFamLockSurname] = useState(null); // string | null
+  // NEW: live checks for emergency name / relation (letters + spaces only)
+  const emergencyNameError = useMemo(() => {
+    if (!form.emergencyPersonName) return "";
+    return lettersOnlyBad(form.emergencyPersonName) ? "Letters and spaces only." : "";
+  }, [form.emergencyPersonName]);
+
+  const emergencyRelationError = useMemo(() => {
+    if (!form.emergencyRelation) return "";
+    return lettersOnlyBad(form.emergencyRelation) ? "Letters and spaces only." : "";
+  }, [form.emergencyRelation]);
+
+  const [famLockSurname, setFamLockSurname] = useState(null);
   const [famLookupLoading, setFamLookupLoading] = useState(false);
   const norm = (s = "") => s.trim().toUpperCase();
-
   const set = (k, v) => setField(k, v);
 
   // ----- VALIDATION (submit-time) -----
   const validate = () => {
-    // required
     if (!form.familyNumber.trim()) return "Family Number is required.";
     if (!form.surname.trim()) return "Surname is required.";
     if (!form.firstName.trim()) return "First Name is required.";
@@ -185,29 +193,24 @@ function PatientRegistration() {
     if (!form.birthdate) return "Birthdate is required.";
     if (!form.age) return "Age is required.";
 
-    // checks
     if (/[^0-9]/.test(form.familyNumber)) return "Family Number must contain numbers only.";
     if (lettersOnlyBad(form.surname)) return "Surname must contain letters and spaces only.";
     if (lettersOnlyBad(form.firstName)) return "First Name must contain letters and spaces only.";
     if (form.middleName && lettersOnlyBad(form.middleName)) return "Middle Name must contain letters and spaces only.";
 
-    // Birthdate rules
     const bd = new Date(form.birthdate);
     const today = new Date();
     today.setHours(0,0,0,0);
     if (isNaN(bd.getTime())) return "Birthdate is invalid.";
     if (bd > today) return "Birthdate cannot be in the future.";
 
-    // Age caps
     if (Number(form.age) > 120) return "Age must not exceed 120.";
     if (birthdateYears !== null && birthdateYears > 120) return "Birthdate implies age over 120.";
 
-    // Family number lock
     if (famLockSurname && norm(form.surname) !== norm(famLockSurname)) {
       return `Family Number is already assigned to surname "${famLockSurname}". Please use that surname or choose a different Family Number.`;
     }
 
-    // Contacts
     if (form.contactNumber && String(form.contactNumber).length !== 11)
       return "Contact Number must be exactly 11 digits.";
     if (form.contactPerson && String(form.contactPerson).length !== 11)
@@ -218,7 +221,6 @@ function PatientRegistration() {
     if (form.weightKg && !oneDec.test(form.weightKg)) return "Weight must have at most 1 decimal place.";
     if (form.temperatureC && !oneDec.test(form.temperatureC)) return "Temperature must have at most 1 decimal place.";
 
-    // BP format final check
     if (form.bloodPressure) {
       const s = String(form.bloodPressure);
       const slashCount = (s.match(/\//g) || []).length;
@@ -226,6 +228,14 @@ function PatientRegistration() {
       if (slashCount > 1) return 'Blood Pressure may contain only one "/".';
       if (!/^\d{1,3}(?:\/\d{1,3})?$/.test(s)) return 'Blood Pressure must look like "120/80".';
     }
+
+    // NEW required checks for Emergency section
+    if (!form.emergencyPersonName.trim()) return "Emergency Contact Person is required.";
+    if (lettersOnlyBad(form.emergencyPersonName)) return "Emergency Contact Person must contain letters and spaces only.";
+    if (!form.emergencyRelation.trim()) return "Emergency Relation is required.";
+    if (lettersOnlyBad(form.emergencyRelation)) return "Emergency Relation must contain letters and spaces only.";
+    if (!form.contactPerson || String(form.contactPerson).length !== 11)
+      return "Emergency Contact Number must be exactly 11 digits.";
 
     return null;
   };
@@ -239,11 +249,8 @@ function PatientRegistration() {
     const err = validate();
     if (err) { alert(err); return; }
 
-    // Confirm missing middle name
     if (!form.middleName.trim()) {
-      const okMiddle = window.confirm(
-        "Are you sure this patient does not have any middle name?"
-      );
+      const okMiddle = window.confirm("Are you sure this patient does not have any middle name?");
       if (!okMiddle) return;
     }
 
@@ -255,7 +262,7 @@ function PatientRegistration() {
     await submit();
   };
 
-  // Insert into public.patients (RLS + trigger will set created_by)
+  // Insert into public.patients (extended payload)
   const submit = async () => {
     if (saving) return;
     const err = validate();
@@ -265,11 +272,13 @@ function PatientRegistration() {
     setNote(null);
 
     try {
-      // Map UI select (MALE/FEMALE/OTHER) to DB check (MEN/WOMEN/OTHER)
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess?.session?.user?.id;
+
       const sexForDb =
         form.sex === "MALE" ? "MEN" :
         form.sex === "FEMALE" ? "WOMEN" :
-        form.sex; // OTHER stays OTHER
+        form.sex;
 
       const payload = {
         family_number: form.familyNumber.trim(),
@@ -280,12 +289,22 @@ function PatientRegistration() {
         birthdate: form.birthdate || null,
         age: form.age ? Number(form.age) : null,
         contact_number: form.contactNumber.trim() || null,
+
+        // Existing column preserved: this remains the NUMBER used in emergency section
         contact_person: form.contactPerson.trim() || null,
+
+        // NEW columns
+        emergency_contact_name: form.emergencyPersonName.trim() || null,
+        emergency_relation: form.emergencyRelation.trim() || null,
+
         height_cm: form.heightCm ? Number(form.heightCm) : null,
         weight_kg: form.weightKg ? Number(form.weightKg) : null,
         blood_pressure: form.bloodPressure.trim() || null,
         temperature_c: form.temperatureC ? Number(form.temperatureC) : null,
         chief_complaint: form.chiefComplaint.trim() || null,
+        created_by: uid || null,
+        queued: !!form.proceedToQueue,
+        queued_at: form.proceedToQueue ? new Date().toISOString() : null,
       };
 
       const { data, error } = await supabase
@@ -296,6 +315,7 @@ function PatientRegistration() {
 
       if (error) throw error;
 
+      // Create a queued record if requested, snapshot emergency fields
       if (form.proceedToQueue && data?.id) {
         const { data: existing, error: existErr } = await supabase
           .from("patient_records")
@@ -316,19 +336,19 @@ function PatientRegistration() {
               blood_pressure: payload.blood_pressure,
               temperature_c: payload.temperature_c,
               chief_complaint: payload.chief_complaint,
+
+              // NEW: emergency contact snapshot
+              emergency_contact_name: payload.emergency_contact_name || null,
+              emergency_relation: payload.emergency_relation || null,
+              emergency_contact_number: payload.contact_person || null,
+
               queued: true,
               status: "queued",
+              created_by: uid || null,
+              queued_at: new Date().toISOString()
             });
 
-          if (recErr) {
-            console.error("patient_records insert error", {
-              code: recErr.code,
-              message: recErr.message,
-              details: recErr.details,
-              hint: recErr.hint,
-            });
-            throw recErr;
-          }
+          if (recErr) throw recErr;
         }
       }
 
@@ -348,7 +368,7 @@ function PatientRegistration() {
     }
   };
 
-  // Auto-age from birthdate (in whole years)
+  // Auto-age from birthdate
   useEffect(() => {
     if (!form.birthdate) return;
     const b = new Date(form.birthdate);
@@ -361,7 +381,7 @@ function PatientRegistration() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.birthdate]);
 
-  // Lookup canonical surname for the entered family number (exact match)
+  // Family number -> surname lock
   useEffect(() => {
     const fn = form.familyNumber.trim();
     if (!fn) { setFamLockSurname(null); return; }
@@ -398,146 +418,231 @@ function PatientRegistration() {
   }, [form.familyNumber]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <section className="max-w-5xl mx-auto">
-      <h2 className="text-sm font-semibold text-orange-600 mb-3 text-center">Patient Registration</h2>
+    <section className="section section--registration">
+      <h2 className="section-title">Patient Registration</h2>
 
-      <form onSubmit={handleSubmitClick} className="bg-orange-50 rounded-xl border border-orange-200 p-6 space-y-5" autoComplete="off" aria-busy={saving}>
-        <Row two>
-          <Field
-            label="Family Number"
-            value={form.familyNumber}
-            setValue={v=>set("familyNumber",v)}
-            required
-            hideAsterisk
-            error={familyNumberError}
-            digitsOnly
-          />
-          <div>
-            <Field
-              label="Surname"
-              value={form.surname}
-              setValue={v=>set("surname",v)}
-              required
-              hideAsterisk
-              disabled={!!famLockSurname}
-              error={surnameError}
-            />
+      <form
+        onSubmit={handleSubmitClick}
+        className="form form--patient-registration"
+        autoComplete="off"
+        aria-busy={saving}
+      >
+        {/* ===== Card: Patient Record ===== */}
+        <div className="card card--patient">
+          <div className="card__header">
+            <span className="card__title">Patient Record</span>
+          </div>
+          <div className="card__body">
+            <Row two>
+              <Field
+                label="Family Number"
+                value={form.familyNumber}
+                setValue={(v)=>set("familyNumber",v)}
+                required
+                hideAsterisk
+                error={familyNumberError}
+                digitsOnly
+              />
+              <Field
+                label="Surname"
+                value={form.surname}
+                setValue={(v)=>set("surname",v)}
+                required
+                hideAsterisk
+                disabled={!!famLockSurname}
+                error={surnameError}
+              />
+            </Row>
+
             {famLockSurname && (
-              <div className="text-xs text-orange-700 mt-1">
-                This Family Number is linked to <span className="font-semibold">"{famLockSurname}"</span>. Surname is locked.
+              <div className="hint hint--lock">
+                This Family Number is linked to <span className="hint-strong">"{famLockSurname}"</span>. Surname is locked.
               </div>
             )}
             {!famLockSurname && famLookupLoading && (
-              <div className="text-xs text-gray-500 mt-1">Checking family mapping...</div>
+              <div className="hint">Checking family mapping...</div>
             )}
+
+            <Row two>
+              <Field
+                label="First Name"
+                value={form.firstName}
+                setValue={(v)=>set("firstName",v)}
+                required
+                hideAsterisk
+                error={firstNameError}
+              />
+              <Field
+                label="Extension"
+                value={form.middleName}
+                setValue={(v)=>set("middleName",v)}
+                error={middleNameError}
+              />
+            </Row>
+
+            <Row two>
+              <Select
+                label="Sex"
+                value={form.sex}
+                onChange={(v)=>set("sex",v)}
+                options={["MALE","FEMALE","OTHER"]}
+                required
+                hideAsterisk
+              />
+              <Field
+                label="Birthdate"
+                type="date"
+                value={form.birthdate}
+                setValue={(v)=>set("birthdate",v)}
+                required
+                hideAsterisk
+                max={todayISO}
+                error={birthdateError}
+              />
+            </Row>
+
+            <Row two>
+              <Field
+                label="Age"
+                type="number"
+                value={form.age}
+                setValue={(v)=>set("age",v)}
+                required
+                hideAsterisk
+                min={0}
+                max={120}
+                error={ageError}
+              />
+              <Field
+                label="Contact Number"
+                value={form.contactNumber}
+                setValue={(v)=>set("contactNumber",v)}
+                digitsOnly
+                digitsOnlyExact={11}
+              />
+            </Row>
+
+            {isInfant && (
+              <div className="note note--info note--compact">
+                Age based on birthdate: {infantMonths} month{infantMonths === 1 ? "" : "s"}
+              </div>
+            )}
+
+            <div className="subsection">
+              <div className="subsection__title">In case of Emergency</div>
+              <Row two>
+                <Field
+                  label="Contact Person"
+                  value={form.emergencyPersonName}
+                  setValue={(v)=>set("emergencyPersonName",v)}
+                  required
+                  hideAsterisk
+                  error={emergencyNameError}
+                />
+                <Field
+                  label="Relation"
+                  value={form.emergencyRelation}
+                  setValue={(v)=>set("emergencyRelation",v)}
+                  required
+                  hideAsterisk
+                  error={emergencyRelationError}
+                />
+              </Row>
+              <Field
+                label="Contact Number"
+                value={form.contactPerson}          // existing key, kept (NUMBER)
+                setValue={(v)=>set("contactPerson",v)}
+                digitsOnly
+                digitsOnlyExact={11}
+                required
+                hideAsterisk
+              />
+            </div>
           </div>
-        </Row>
-
-        <Row two>
-          <Field
-            label="First Name"
-            value={form.firstName}
-            setValue={v=>set("firstName",v)}
-            required
-            hideAsterisk
-            error={firstNameError}
-          />
-          <Field
-            label="Middle Name"
-            value={form.middleName}
-            setValue={v=>set("middleName",v)}
-            error={middleNameError}
-          />
-        </Row>
-        <Row two>
-          <Select label="Sex" value={form.sex} onChange={v=>set("sex",v)} options={["MALE","FEMALE","OTHER"]} required hideAsterisk />
-          <Field
-            label="Birthdate"
-            type="date"
-            value={form.birthdate}
-            setValue={v=>set("birthdate",v)}
-            required
-            hideAsterisk
-            max={todayISO}
-            error={birthdateError}
-          />
-        </Row>
-
-        <Row two>
-          <Field
-            label="Age"
-            type="number"
-            value={form.age}
-            setValue={v=>set("age",v)}
-            required
-            hideAsterisk
-            min={0}
-            max={120}
-            error={ageError}
-          />
-          <Field label="Contact Number" value={form.contactNumber} setValue={v=>set("contactNumber",v)} digitsOnly digitsOnlyExact={11} />
-        </Row>
-
-        {isInfant && (
-          <div className="text-xs text-gray-600 -mt-2 mb-2">
-            Age based on birthdate: {infantMonths} month{infantMonths === 1 ? "" : "s"}
-          </div>
-        )}
-
-        <Field
-          label="Contact Person"
-          value={form.contactPerson}
-          setValue={v=>set("contactPerson",v)}
-          digitsOnly
-          digitsOnlyExact={11}
-        />
-        <hr className="border-orange-200" />
-
-        <Row two>
-          <Field label="Height (cm)" value={form.heightCm} setValue={v=>set("heightCm",v)} oneDecimal placeholder="e.g. 172.4" />
-          <Field label="Weight (kg)" value={form.weightKg} setValue={v=>set("weightKg",v)} oneDecimal placeholder="e.g. 83.0" />
-        </Row>
-        <Row two>
-          <Field
-            label="Blood Pressure"
-            value={form.bloodPressure}
-            setValue={v=>set("bloodPressure",v)}
-            placeholder="e.g. 120/80"
-            error={bpError}
-          />
-          <Field label="Temperature (°C)" value={form.temperatureC} setValue={v=>set("temperatureC",v)} oneDecimal placeholder="e.g. 37.5" />
-        </Row>
-
-        <div>
-          <label className="block text-sm mb-1">Chief Complaint:</label>
-          <textarea className="w-full border rounded px-3 py-2 min-h-[120px] bg-white"
-            value={form.chiefComplaint} onChange={e=>set("chiefComplaint", e.target.value)}
-            autoComplete="off" spellCheck={false} />
         </div>
-        <label className="flex items-center gap-2 text-sm">
+
+        {/* ===== Card: Nurse's Notes ===== */}
+        <div className="card card--notes">
+          <div className="card__header">
+            <span className="card__title">Nurse’s Notes</span>
+          </div>
+          <div className="card__body">
+            <div className="stack">
+              <Field
+                label="Height"
+                value={form.heightCm}
+                setValue={(v)=>set("heightCm",v)}
+                oneDecimal
+                placeholder="e.g. 170.0"
+              />
+              <Field
+                label="Weight"
+                value={form.weightKg}
+                setValue={(v)=>set("weightKg",v)}
+                oneDecimal
+                placeholder="e.g. 59.0"
+              />
+              <Field
+                label="Blood Pressure"
+                value={form.bloodPressure}
+                setValue={(v)=>set("bloodPressure",v)}
+                placeholder="e.g. 120/80"
+                error={bpError}
+              />
+              <Field
+                label="Temperature"
+                value={form.temperatureC}
+                setValue={(v)=>set("temperatureC",v)}
+                oneDecimal
+                placeholder="e.g. 36.8"
+              />
+            </div>
+
+            <div className="field-group">
+              <label className="label">Chief Complaint:</label>
+              <textarea
+                className="textarea textarea--complaint"
+                value={form.chiefComplaint}
+                onChange={(e)=>set("chiefComplaint", e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+        </div>
+
+        <label className="checkbox">
           <input
             type="checkbox"
-            className="accent-orange-500"
+            className="checkbox-input"
             checked={form.proceedToQueue}
-            onChange={e=>set("proceedToQueue", e.target.checked)}
+            onChange={(e)=>set("proceedToQueue", e.target.checked)}
             required
           />
-          Proceed to Queuing
+          <span className="checkbox-label">Proceed to Queuing</span>
         </label>
 
-        <button
-          type="submit"
-          className="w-full bg-orange-500 text-white rounded-lg py-2 hover:bg-orange-600 disabled:opacity-60"
-          disabled={saving || !canSubmit}
-          title={!canSubmit ? "Complete required fields to enable submit" : ""}
-        >
-          {saving ? "Saving..." : "Submit"}
-        </button>
+        <div className="form-actions">
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={clearForm}
+            disabled={saving}
+          >
+            Discard
+          </button>
+          <button
+            type="submit"
+            className="btn btn--primary btn--submit"
+            disabled={saving || !canSubmit}
+            title={!canSubmit ? "Complete required fields to enable submit" : ""}
+          >
+            {saving ? "Saving..." : "Save Chart"}
+          </button>
+        </div>
 
         {note && (
-          <div className={`mt-3 text-sm p-2 rounded ${
-            note.type === "success" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-          }`}>
+          <div className={`note ${note.type === "success" ? "note--success" : "note--error"}`}>
             {note.msg}
           </div>
         )}
@@ -546,8 +651,11 @@ function PatientRegistration() {
   );
 }
 
+/* ---------------- LAYOUT HELPERS (STRUCTURE ONLY) ---------------- */
 const Row = ({two=false, children}) => (
-  <div className={`grid gap-4 ${two?"grid-cols-1 md:grid-cols-2":""}`}>{children}</div>
+  <div className={`row ${two ? "row--two" : ""}`}>
+    {children}
+  </div>
 );
 
 function Field({
@@ -559,13 +667,13 @@ function Field({
   step,
   required = false,
   digitsOnly = false,
-  digitsOnlyExact,       // exact digit length (e.g., 11)
-  oneDecimal = false,    // allow at most 1 decimal place
+  digitsOnlyExact,
+  oneDecimal = false,
   disabled = false,
-  min,                   // pass-through for inputs like date/number
-  max,                   // pass-through for inputs like date/number
-  error = "",            // live error message string
-  hideAsterisk = false,  // NEW: allow hiding the visual star while keeping required
+  min,
+  max,
+  error = "",
+  hideAsterisk = false,
 }) {
   const onlyDigits = (s) => s.replace(/\D+/g, "");
 
@@ -604,14 +712,12 @@ function Field({
   const hasError = !!error || showLenError;
 
   return (
-    <div>
-      <label className="block text-sm mb-1">
-        {label}{required && !hideAsterisk && <span className="text-red-500"> *</span>}:
+    <div className="field">
+      <label className="label">
+        {label}{required && !hideAsterisk && <span className="required-asterisk"> *</span>}:
       </label>
       <input
-        className={`w-full border rounded px-3 py-2 bg-white ${
-          disabled ? "opacity-70 cursor-not-allowed bg-gray-50" : ""
-        } ${hasError ? "border-red-400" : ""}`}
+        className={`input ${disabled ? "is-disabled" : ""} ${hasError ? "has-error" : ""}`}
         type={(digitsOnly || oneDecimal) ? "text" : type}
         inputMode={oneDecimal ? "decimal" : (digitsOnly ? "numeric" : undefined)}
         pattern={oneDecimal ? "^\\d+(\\.\\d)?$" : (exactLen ? `\\d{${exactLen}}` : (digitsOnly ? "\\d*" : undefined))}
@@ -636,26 +742,22 @@ function Field({
         }
       />
       {showLenError && (
-        <div className="text-xs text-red-600 mt-1">
-          Must be exactly {exactLen} digits.
-        </div>
+        <div className="error-text">Must be exactly {exactLen} digits.</div>
       )}
-      {!!error && (
-        <div className="text-xs text-red-600 mt-1">{error}</div>
-      )}
+      {!!error && <div className="error-text">{error}</div>}
     </div>
   );
 }
 
 function Select({ label, value, onChange, options, required = false, hideAsterisk = false }) {
   return (
-    <div>
-      <label className="block text-sm mb-1">
-        {label}{required && !hideAsterisk && <span className="text-red-500"> *</span>}:
+    <div className="field">
+      <label className="label">
+        {label}{required && !hideAsterisk && <span className="required-asterisk"> *</span>}:
       </label>
-      <div className="relative">
+      <div className="select">
         <select
-          className="w-full border rounded px-3 py-2 appearance-none bg-white"
+          className="select-input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           required={required}
@@ -665,9 +767,7 @@ function Select({ label, value, onChange, options, required = false, hideAsteris
             <option key={o} value={o}>{o}</option>
           ))}
         </select>
-        <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-          v
-        </div>
+        <span className="select-caret">v</span>
       </div>
     </div>
   );
@@ -676,7 +776,7 @@ function Select({ label, value, onChange, options, required = false, hideAsteris
 /* ---------------- Patient Records ---------------- */
 function PatientRecords() {
   const [q, setQ] = useState("");
-  const [items, setItems] = useState([]); // <-- fixed (was "the [items, setItems]")
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const firstRun = useRef(false);
@@ -697,7 +797,6 @@ function PatientRecords() {
       setLoading(true);
       setErr("");
 
-      // Distinct families from patients; search by family_number or surname
       const like = q.trim();
       let query = supabase
         .from("patients")
@@ -729,21 +828,19 @@ function PatientRecords() {
   }
 
   return (
-    <section className="max-w-5xl mx-auto w-full">
-      <h2 className="text-sm font-semibold text-orange-600 mb-3 text-center">
-        Patient Records
-      </h2>
+    <section className="section section--records">
+      <h2 className="section-title">Patient Records</h2>
 
-      <div className="flex items-center gap-3 mb-4">
+      <div className="toolbar">
         <input
-          className="flex-1 border rounded px-3 py-2"
+          className="input input--search"
           placeholder="Search by Family No. or Surname..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoComplete="off"
         />
         <button
-          className="border rounded px-3 py-2 hover:bg-gray-50"
+          className="btn btn--secondary"
           onClick={() => void load()}
           disabled={loading}
         >
@@ -751,23 +848,21 @@ function PatientRecords() {
         </button>
       </div>
 
-      {err && (
-        <div className="text-sm bg-red-100 text-red-700 p-2 rounded mb-3">{err}</div>
-      )}
+      {err && <div className="alert alert--error">{err}</div>}
 
-      <div className="max-w-3xl mx-auto mt-2 space-y-2">
+      <div className="family-list">
         {items.map((row) => (
           <Link
             key={`${row.family_number}-${row.surname}`}
             to={`/bhw/family/${encodeURIComponent(row.family_number)}`}
-            className="block w-[420px] sm:w-[460px] mx-auto border border-gray-600 rounded px-3 py-2 text-center text-base hover:bg-orange-50"
+            className="family-list__item"
           >
             {row.family_number} - {row.surname}
           </Link>
         ))}
 
         {items.length === 0 && !loading && (
-          <div className="text-center text-sm text-gray-500">No families found.</div>
+          <div className="empty">No families found.</div>
         )}
       </div>
     </section>

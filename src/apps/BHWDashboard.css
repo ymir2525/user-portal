@@ -1,0 +1,126 @@
+/* === Layout: header + sidebar + main side-by-side === */
+:root{
+  --header-h: 64px;
+  --sidebar-w: 240px; /* tweak to your taste */
+}
+
+/* Turn the whole page into a 2-row, 2-column grid:
+   Row 1 = header spans both columns
+   Row 2 = sidebar (col 1) + main (col 2) */
+.app.app--bhw{
+  display: grid;
+  grid-template-rows: var(--header-h) 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* Header stays on top; use sticky so no manual padding needed */
+.app--bhw .app-header{
+  grid-column: 1 / -1;
+  position: sticky; /* or fixed if you prefer */
+  top: 0;
+  height: var(--header-h);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: #fff; /* ensure it covers content when sticky */
+  border-bottom: 1px solid #e5e5e5;
+}
+
+/* Sidebar sits left, scrolls independently */
+.app--bhw .sidebar{
+  grid-row: 2;
+  grid-column: 1;
+  width: var(--sidebar-w);
+  overflow: auto;
+  border-right: 1px solid #e5e5e5;
+  padding: 12px 10px;
+  background: #0d3554; /* use your theme color or remove */
+  color: #fff;
+}
+
+/* Main content sits right of the sidebar */
+.app--bhw .main{
+  grid-row: 2;
+  grid-column: 2;
+  overflow: auto;
+  padding: 16px;
+  background: #f7f9fb; /* optional */
+}
+
+/* Optional: make the sidebar nav look decent */
+.sidebar-nav{
+  display: grid;
+  gap: 8px;
+}
+.tab-btn{
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  cursor: pointer;
+}
+.tab-btn--active{
+  background: #fff;
+  color: #0d3554;
+}
+
+/* Cards and fields (from earlier) — keep yours; included here for completeness */
+.card {
+  background: #fff;
+  border: 1px solid #d8d8d8;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.card__header { display: flex; align-items: center; margin-bottom: 8px; }
+.card__title { font-weight: 600; font-size: 14px; }
+.subsection { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #d8d8d8; }
+.subsection__title { font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+
+.row { display: grid; gap: 10px; margin-bottom: 10px; }
+.row--two { grid-template-columns: 1fr 1fr; }
+@media (max-width: 920px){ .app.app--bhw{ grid-template-columns: 1fr; } .sidebar{ grid-column:1; grid-row:2; width:auto; } .main{ grid-column:1; } .row--two{ grid-template-columns:1fr; } }
+
+.stack { display: grid; gap: 8px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.label { font-size: 12px; color: #333; }
+.input, .select-input, .textarea {
+  width: 100%; border: 1px solid #bdbdbd; border-radius: 6px; padding: 8px 10px; font-size: 14px; background: #fff;
+}
+.input.is-disabled { background: #f4f4f4; }
+.input.has-error, .textarea.has-error { border-color: #d93025; }
+.textarea--complaint { min-height: 110px; resize: vertical; }
+
+.hint { font-size: 12px; color: #666; margin: 4px 0 8px; }
+.hint--lock .hint-strong { font-weight: 600; }
+.error-text { font-size: 12px; color: #d93025; margin-top: 4px; }
+.required-asterisk { color: #d93025; }
+
+.select { position: relative; }
+.select-input { appearance: none; }
+.select-caret { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+
+.note { margin-top: 12px; padding: 10px; border-radius: 6px; border: 1px solid transparent; }
+.note--success { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+.note--error { background: #fdecea; border-color: #f5c6cb; color: #8a1f11; }
+.note--info { background: #eef6ff; border-color: #cfe0ff; color: #0b4aa2; }
+.note--compact { padding: 6px 8px; }
+
+.form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0 6px; }
+.btn { padding: 10px 12px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; }
+.btn--primary { background: #e9f7ee; border-color: #9ad4a7; }
+.btn--primary:disabled { opacity: 0.6; cursor: default; }
+.btn--ghost { background: #fff; border-color: #ef9a9a; color: #b71c1c; }
+
+/* Helpful stubs */
+.alert--error { background:#fdecea; border:1px solid #f5c6cb; color:#8a1f11; padding:8px 10px; border-radius:6px; }
+.input--search { max-width: 320px; }
+.family-list { display:grid; gap:8px; margin-top:12px; }
+.family-list__item { padding:10px; border:1px solid #ddd; border-radius:6px; text-decoration:none; color:#222; }
