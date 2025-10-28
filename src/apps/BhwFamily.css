@@ -28,8 +28,10 @@
 }
 
 *{box-sizing:border-box}
+html, body { height:100%; }
+body { margin:0; }
 
-/* Utility if you left this class in JSX */
+/* Utility */
 .text-center{ text-align:center; }
 
 /* ------------------------------
@@ -41,13 +43,16 @@
   background:#fff;
   color:#111827;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
 }
 
 .topbar{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  margin-bottom:16px;
+  gap:12px;
 }
 
 .link{
@@ -64,10 +69,10 @@
 .page-title{
   text-align:center;
   font-weight:600;
-  margin-bottom:16px;
+  margin:0;
 }
 .page-title--family{
-  color:#c2410c;              /* matches the orange heading in your screenshots */
+  color:#c2410c;
 }
 
 /* Status / messages */
@@ -75,7 +80,7 @@
 .status--loading{ color:#111827; }
 
 .error-text{
-  color:var(--red-600);        /* VALIDATIONS stay red */
+  color:var(--red-600);
   font-size:12px;
   margin-top:6px;
 }
@@ -109,8 +114,8 @@
 .member-card{
   display:block;
   width:100%;
-  max-width:460px;
-  border:1px solid var(--gray-700);  /* dark border like screenshot */
+  max-width:720px;
+  border:1px solid var(--gray-300);
   border-radius:8px;
   padding:10px 12px;
   text-align:left;
@@ -120,7 +125,7 @@
 .member-card:hover{ background:var(--orange-50); }
 
 .member-card__row{ display:flex; align-items:center; gap:8px; }
-.member-card__main{ flex:1; }
+.member-card__main{ flex:1; min-width:0; }
 .member-card__name{ font-weight:600; }
 .member-card__meta{ font-size:12px; color:var(--gray-500); }
 .member-card__date{ font-size:12px; color:var(--gray-700); }
@@ -128,19 +133,25 @@
 /* ------------------------------
    Patient header + meta (second screen)
 ------------------------------ */
-.patient-wrap{ max-width:980px; margin:0 auto; }
+.patient-wrap{ width:100%; max-width:980px; margin:0 auto; }
 .patient-head{
   display:flex;
   align-items:center;
   justify-content:space-between;
+  gap:12px;
   margin-bottom:8px;
+  flex-wrap:wrap;
 }
 .patient-name{ font-weight:600; font-size:18px; }
 .patient-meta{
   font-size:14px;
   display:grid;
   gap:4px;
+  grid-template-columns:1fr;
   margin-bottom:16px;
+}
+@media (min-width:640px){
+  .patient-meta{ grid-template-columns:repeat(3, minmax(0,1fr)); }
 }
 
 .subhead{
@@ -165,11 +176,8 @@
   cursor:pointer;
 }
 .record-item:hover{ background:var(--orange-50); }
-.record-item__title{ font-weight:700; font-size:18px; } /* bold date like screenshot */
+.record-item__title{ font-weight:700; font-size:18px; }
 .record-item__meta{ font-size:12px; color:var(--gray-500); margin-top:2px; }
-
-.actions{ display:flex; gap:12px; margin-top:16px; }
-.actions--back{ margin-top:16px; }
 
 /* ------------------------------
    Forms / fields (new record)
@@ -180,7 +188,7 @@
   border-radius:12px;
   padding:20px;
 }
-.form--new-record{ /* keeps class name explicit for this form */ }
+.form--new-record{ position:relative; }
 
 .row{ display:grid; gap:16px; margin-bottom:16px; }
 .row--two{ grid-template-columns:1fr; }
@@ -206,7 +214,7 @@
 .input--readonly{ background:var(--gray-100); }
 .input--one-third{ width:100%; max-width:240px; }
 
-.has-error{ border-color:var(--red-400) !important; } /* red border on invalid */
+.has-error{ border-color:var(--red-400) !important; }
 .textarea{ min-height:120px; resize:vertical; }
 
 /* Checkbox */
@@ -221,20 +229,21 @@
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  padding:8px 12px;
+  padding:10px 12px;
   border-radius:8px;
   border:1px solid transparent;
   cursor:pointer;
   font: inherit;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
 }
 .btn:disabled{ opacity:.6; cursor:not-allowed; }
 
 .btn--primary{
-  background:var(--orange-500);
-  color:#fff;
-  border-color:var(--orange-600);
+  background:var(--green-300);
+  color:#0f5132;
+  border-color:var(--green-200);
 }
-.btn--primary:hover:not(:disabled){ background:var(--orange-600); }
+.btn--primary:hover:not(:disabled){ background:var(--green-200); }
 
 .btn--secondary{
   background:var(--gray-200);
@@ -242,7 +251,6 @@
 }
 .btn--secondary:hover{ background:var(--gray-300); }
 
-/* green "+ New Record" like your screenshot */
 .btn--accent{
   background:var(--green-200);
   color:#065f46;
@@ -252,7 +260,6 @@
 }
 .btn--accent:hover{ background:var(--green-300); }
 
-/* wide orange bars for "View Chart" / "View Documents" */
 .btn--accent-block{
   width:100%;
   background:var(--orange-300);
@@ -260,7 +267,6 @@
 }
 .btn--accent-block:hover{ background:var(--orange-400); }
 
-/* small pale orange Back buttons inside subviews */
 .btn--light{
   background:var(--orange-200);
   color:#7c2d12;
@@ -270,6 +276,31 @@
 }
 .btn--light:hover{ background:var(--orange-300); }
 
+.btn--full{ width:100%; }
+
+/* Actions */
+.actions{
+  display:flex;
+  gap:12px;
+  margin-top:16px;
+  align-items:center;
+}
+@media (max-width:767px){
+  .actions{ flex-direction:column; }
+  .btn--secondary{ width:100%; }
+}
+
+/* Sticky submit bar – always visible (no hover dependency) */
+.actions--sticky{
+  position: sticky;
+  bottom: 0;
+  background:#fff;                     /* solid background fixes “only on hover” look */
+  padding-top:12px;
+  padding-bottom:8px;
+  z-index:10;
+  box-shadow:0 -4px 10px rgba(0,0,0,.05);
+}
+
 /* ------------------------------
    Past record subviews
 ------------------------------ */
@@ -278,6 +309,8 @@
   display:flex;
   align-items:center;
   justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
 }
 .past-meta{
   margin-top:12px;
@@ -321,7 +354,96 @@
   display:flex;
   align-items:center;
   justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
 }
 .doc-row__title{ font-weight:700; text-transform:uppercase; }
 .doc-row__meta{ text-transform:none; color:var(--gray-500); font-size:12px; margin-left:6px; }
 .doc-row__link{ font-size:12px; }
+/* === FIX: sticky footer + primary button always visible === */
+
+/* Solid sticky footer so controls never blend into the form bg */
+.actions--sticky{
+  position: sticky;
+  bottom: 0;
+  z-index: 100;                 /* stay on top */
+  background: #ffffff;          /* solid white, not translucent */
+  border-top: 1px solid var(--gray-200);
+  padding-top: 12px;
+  padding-bottom: 12px;
+  box-shadow: 0 -4px 10px rgba(0,0,0,.05);
+}
+
+/* Make the submit button clearly visible in its default (non-hover) state */
+.btn--primary{
+  background: orange !important;   /* green-600 fallback to guarantee contrast */
+  color: #ffffff !important;
+  border-color: orange !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04);
+}
+
+/* Slight hover change only (no visibility dependency on hover) */
+/* === Submit button: orange bg + white text (normal, hover, disabled) === */
+.btn--primary{
+  background: var(--orange-500) !important;  /* vivid orange */
+  color: #ffffff !important;                 /* white text */
+  border-color: var(--orange-600) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04);
+}
+
+.btn--primary:hover:not(:disabled){
+  background: var(--orange-600) !important;  /* deeper on hover */
+}
+
+/* keep disabled version visible and consistent */
+.btn--primary:disabled{
+  background: var(--orange-300) !important;  /* lighter orange */
+  color: #ffffff !important;                 /* still white text */
+  border-color: var(--orange-400) !important;
+  opacity: 1 !important;                     /* do not fade out */
+  cursor: not-allowed;
+}
+
+/* full-width submit in sticky bar */
+.btn--full{ width: 10% !important; }
+
+/* (keep this) solid sticky bar so contrast is always good */
+.actions--sticky{
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
+  background: #ffffff;
+  border-top: 1px solid var(--gray-200);
+  padding-top: 12px;
+  padding-bottom: 12px;
+  box-shadow: 0 -4px 10px rgba(0,0,0,.05);
+}
+
+/* optional: clear keyboard focus ring for accessibility */
+.btn--primary:focus-visible{
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(249,115,22,.35);
+}
+/* ---- Match Dashboard's card + stacked layout in New Record ---- */
+.stack{ display:grid; gap:8px; }
+.subsection{ margin-top:8px; padding-top:8px; border-top:1px dashed var(--gray-300); }
+.subsection__title{ font-weight:600; font-size:13px; margin-bottom:8px; }
+
+/* Make the patient-meta block show like your screenshot */
+.patient-meta{
+  font-size:14px;
+  display:grid;
+  gap:4px;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.patient-meta .patient-emergency{
+  grid-column: 1 / -1; /* full width row for the long emergency line */
+}
+.patient-meta .patient-right{
+  justify-self:end;
+}
+
+/* Optional: card spacing consistency */
+.card { border:1px solid var(--gray-200); border-radius:8px; padding:12px 16px; background:#fff; margin-bottom:16px; }
+.card__title{ font-weight:600; font-size:14px; margin-bottom:8px; }

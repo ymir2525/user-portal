@@ -5,6 +5,19 @@ import "./AccountManagement.css"; // external CSS (no Tailwind)
 
 const ORANGE = "#e9772e";
 
+/* -------- NEW helpers (role normalization + pretty name) -------- */
+const normalizeRole = (r) => String(r ?? "").trim().toUpperCase();
+const ROLE_SET = new Set(["DOCTOR", "NURSE", "BHW"]);
+const toTitle = (s) =>
+  String(s || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (m, g1) => g1.toUpperCase());
+const fullNamePretty = (u) =>
+  [toTitle(u?.firstname), u?.middle_initial ? `${String(u.middle_initial).toUpperCase()}.` : "", toTitle(u?.surname)]
+    .filter(Boolean)
+    .join(" ");
+
 export default function AccountManagement() {
   const [people, setPeople] = useState([]);
   const [q, setQ] = useState("");
@@ -25,7 +38,13 @@ export default function AccountManagement() {
         setPeople([]);
         return;
       }
-      setPeople((data || []).filter((u) => ["Doctor", "Nurse", "BHW"].includes(u.role)));
+
+      /* ------- CHANGED: normalize role & keep only the 3 roles ------- */
+      const rows = (data || []).map((u) => ({
+        ...u,
+        role: normalizeRole(u.role),
+      }));
+      setPeople(rows.filter((u) => ROLE_SET.has(u.role)));
     };
 
     load();
@@ -45,22 +64,27 @@ export default function AccountManagement() {
     };
   }, []);
 
- // No scroll locking for inline form
-useEffect(() => {}, [showNew]);
+  // No scroll locking for inline form
+  useEffect(() => {}, [showNew]);
 
+  /* keep your original fullname function (not used for rendering anymore, but not deleted) */
   const fullname = (u) =>
     [u.firstname, u.middle_initial ? `${u.middle_initial}.` : "", u.surname]
       .filter(Boolean)
       .join(" ");
 
-  const docInCharge = people.find((u) => u.role === "Doctor") || null;
-  const nurseInCharge = people.find((u) => u.role === "Nurse") || null;
+  /* ------- CHANGED: find by normalized role ------- */
+  const docInCharge =
+    people.find((u) => u.role === "DOCTOR" || u.role === "Doctor") || null;
+  const nurseInCharge =
+    people.find((u) => u.role === "NURSE" || u.role === "Nurse") || null;
 
   const term = q.trim().toLowerCase();
+  /* ------- CHANGED: filter BHW via normalized role + search pretty name ------- */
   const bhws = useMemo(() => {
-    const list = people.filter((u) => u.role === "BHW");
+    const list = people.filter((u) => u.role === "BHW" || u.role === "bhw");
     if (!term) return list;
-    return list.filter((u) => fullname(u).toLowerCase().includes(term));
+    return list.filter((u) => fullNamePretty(u).toLowerCase().includes(term));
   }, [people, term]);
 
   return (
@@ -102,7 +126,8 @@ useEffect(() => {}, [showNew]);
       <RowLabel>Doctor-in-Charge</RowLabel>
       <div className="am-row">
         {docInCharge ? (
-          fullname(docInCharge)
+          /* ------- CHANGED: pretty formatting ------- */
+          fullNamePretty(docInCharge)
         ) : (
           <span className="muted">No doctor assigned.</span>
         )}
@@ -112,7 +137,8 @@ useEffect(() => {}, [showNew]);
       <RowLabel>Nurse-in-Charge</RowLabel>
       <div className="am-row">
         {nurseInCharge ? (
-          fullname(nurseInCharge)
+          /* ------- CHANGED: pretty formatting ------- */
+          fullNamePretty(nurseInCharge)
         ) : (
           <span className="muted">No nurse assigned.</span>
         )}
@@ -128,7 +154,10 @@ useEffect(() => {}, [showNew]);
           <ul className="am-bhwlist">
             {bhws.map((u) => (
               <li key={u.id} className="am-bhwitem">
-                <span className="am-bhwname">{fullname(u)}</span>
+                <span className="am-bhwname">
+                  {/* ------- CHANGED: pretty formatting ------- */}
+                  {fullNamePretty(u)}
+                </span>
                 <GreenToggle defaultChecked />
               </li>
             ))}
@@ -168,9 +197,13 @@ function GreenToggle({ defaultChecked = true, onChange }) {
   );
 }
 
-/* ---------------- New Account Modal (UI only; logic unchanged) ---------------- */
+/* ---------------- New Account Modal ---------------- */
 
 function NewAccountModal({ onClose, onSaved }) {
+  // Make sure these exist BEFORE any render logic uses them
+  const [confirmPasswordLocal, setConfirmPasswordLocal] = useState("");
+  const inputBase = "input";
+
   const [surname, setSurname] = useState("");
   const [firstname, setFirstname] = useState("");
   const [middleInitial, setMiddleInitial] = useState("");
@@ -178,6 +211,7 @@ function NewAccountModal({ onClose, onSaved }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
   const [role, setRole] = useState("BHW");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
@@ -359,49 +393,51 @@ function NewAccountModal({ onClose, onSaved }) {
       return flashLocal("Passwords do not match.", "error");
     }
 
-    if (!["Doctor", "Nurse", "BHW"].includes(role))
-      return flashLocal("Role must be Doctor, Nurse, or BHW.", "error");
+    // Allow Admin here too (edge func also allows Admin)
+    if (!["Doctor", "Nurse", "BHW", "Admin"].includes(role))
+      return flashLocal("Role must be Doctor, Nurse, BHW, or Admin.", "error");
 
     try {
       setBusy(true);
 
-      const { error: fnErr } = await supabase.functions.invoke("mirror_user_to_auth", {
+      // Call ONLY the edge function – it creates the auth user AND writes to profiles.
+      const { data, error } = await supabase.functions.invoke("mirror_user_to_auth", {
         body: {
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           password,
-          username: username.trim(),
+          username: username.trim().toLowerCase(),
           role,
           firstname: firstname.trim(),
           surname: surname.trim(),
+          middle_initial: (middleInitial || "").trim() || null,
         },
       });
-      if (fnErr) throw fnErr;
 
-      const { error: insertErr } = await supabase.from("profiles").insert({
-        surname: surname.trim(),
-        firstname: firstname.trim(),
-        middle_initial: middleInitial.trim() || null,
-        email: email.trim(),
-        username: username.trim(),
-        role,
-      });
-      if (insertErr) throw insertErr;
+      if (error) {
+        // Surface the real error coming from the Edge Function
+        const msg =
+          (typeof error.context === "string" && error.context) ||
+          (error.context && (error.context.error || error.context.message)) ||
+          error.message ||
+          "Failed to create user.";
+        return flashLocal(msg, "error");
+      }
+
+      if (!data?.ok) {
+        return flashLocal("Unexpected response from server.", "error");
+      }
 
       flashLocal("User created successfully.", "success");
       onSaved?.();
     } catch (err) {
       console.error(err);
       const msg = (typeof err?.message === "string" && err.message) || "Failed to create user.";
-      if (/unique|duplicate/i.test(msg))
-        return flashLocal("Email or Username already exists.", "error");
+      if (/unique|duplicate/i.test(msg)) return flashLocal("Email or Username already exists.", "error");
       flashLocal(msg, "error");
     } finally {
       setBusy(false);
     }
   };
-
-  const [confirmPasswordLocal, setConfirmPasswordLocal] = useState("");
-  const inputBase = "input";
 
   return (
     <div className="modal-overlay">
@@ -541,6 +577,7 @@ function NewAccountModal({ onClose, onSaved }) {
               <option value="BHW">BHW</option>
               <option value="Nurse">Nurse</option>
               <option value="Doctor">Doctor</option>
+              <option value="Admin">Admin</option>
             </select>
           </LabeledInput>
 

@@ -7,7 +7,11 @@ import AccountManagement from "./AccountManagement";
 import PatientRecords from "./PatientRecords";
 import DataAnalytics from "./DataAnalytics";
 import MedicineInventory from "./MedicineInventory";
-
+import AdminDashboard from "./AdminDashboard";
+import QueuingTable from "./QueuingTable";
+import AdminArchive from "./AdminArchive";
+import AdminPatientRecords from "./AdminPatientRecords";
+import AdminChartView from "./AdminChartView";
 const ORANGE   = "#e9772e";
 const PEACH    = "#f3b184";
 const PEACH_BG = "#fde6d3";
@@ -63,69 +67,85 @@ export default function AdminApp() {
           </h2>
 
           <nav className="space-y-2">
-            <NavLink
-              to="/admin/accounts"
-              className={({ isActive }) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({ isActive }) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
-            >
-              Account Management
-            </NavLink>
+  <NavLink to="/admin/dashboard" className={({isActive}) =>
+    `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+  } style={({isActive}) => ({
+    backgroundColor: isActive ? ORANGE : "#ffffff",
+    borderColor: isActive ? ORANGE : PEACH,
+  })}>
+    Dashboard
+  </NavLink>
 
-            <NavLink
-              to="/admin/records"
-              className={({ isActive }) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({ isActive }) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
-            >
-              Patient Records
-            </NavLink>
+  <NavLink to="/admin/queue" className={({isActive}) =>
+    `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+  } style={({isActive}) => ({
+    backgroundColor: isActive ? ORANGE : "#ffffff",
+    borderColor: isActive ? ORANGE : PEACH,
+  })}>
+    Queuing Table
+  </NavLink>
 
-            <NavLink
-              to="/admin/analytics"
-              className={({ isActive }) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({ isActive }) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
-            >
-              Data Analytics
-            </NavLink>
+  <NavLink to="/admin/records" className={({isActive}) =>
+    `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+  } style={({isActive}) => ({
+    backgroundColor: isActive ? ORANGE : "#ffffff",
+    borderColor: isActive ? ORANGE : PEACH,
+  })}>
+    Patient Records
+  </NavLink>
 
-            <NavLink
-              to="/admin/inventory"
-              className={({ isActive }) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({ isActive }) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
-            >
-              Medicine Inventory
-            </NavLink>
+  <NavLink to="/admin/inventory" className={({isActive}) =>
+    `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+  } style={({isActive}) => ({
+    backgroundColor: isActive ? ORANGE : "#ffffff",
+    borderColor: isActive ? ORANGE : PEACH,
+  })}>
+    Medicine Inventory
+  </NavLink>
+
+  <NavLink to="/admin/archive" className={({isActive}) =>
+    `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+  } style={({isActive}) => ({
+    backgroundColor: isActive ? ORANGE : "#ffffff",
+    borderColor: isActive ? ORANGE : PEACH,
+  })}>
+    Archive
+  </NavLink>
+
+  <NavLink to="/admin/analytics" className={({isActive}) =>
+    `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+  } style={({isActive}) => ({
+    backgroundColor: isActive ? ORANGE : "#ffffff",
+    borderColor: isActive ? ORANGE : PEACH,
+  })}>
+    Data Analytics
+  </NavLink>
+
+  <NavLink to="/admin/accounts" className={({isActive}) =>
+    `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+  } style={({isActive}) => ({
+    backgroundColor: isActive ? ORANGE : "#ffffff",
+    borderColor: isActive ? ORANGE : PEACH,
+  })}>
+    Account Management
+  </NavLink>
+
           </nav>
         </aside>
 
         <main className="flex-1 p-6 overflow-y-auto">
           <Routes>
-            <Route index element={<Navigate to="accounts" replace />} />
-            <Route path="accounts"  element={<AccountManagement flash={flash} />} />
-            <Route path="records"   element={<PatientRecords />} />
-            <Route path="analytics" element={<DataAnalytics />} />
-            <Route path="inventory" element={<MedicineInventory flash={flash} />} />
-            <Route path="*"         element={<div>Admin Page Not Found</div>} />
-          </Routes>
+  <Route index element={<Navigate to="dashboard" replace />} />
+  <Route path="dashboard" element={<AdminDashboard />} />
+  <Route path="queue"     element={<QueuingTable />} />
+  <Route path="queue/:patientId" element={<AdminChartView />} /> {/* <-- add this */}
+  <Route path="records"   element={<AdminPatientRecords />} />
+  <Route path="inventory" element={<MedicineInventory flash={flash} />} />
+  <Route path="archive"   element={<AdminArchive />} />
+  <Route path="analytics" element={<DataAnalytics />} />
+  <Route path="accounts"  element={<AccountManagement flash={flash} />} />
+  <Route path="*"         element={<div>Admin Page Not Found</div>} />
+</Routes>
 
           {toast && (
             <div

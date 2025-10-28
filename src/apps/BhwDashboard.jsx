@@ -4,10 +4,11 @@ import { Link, useNavigate } from "react-router-dom";
 import useFormPersist from "../hooks/useFormPersist";
 import { supabase } from "../lib/supabase";
 import "./BHWDashboard.css";
+
 /* ----------------------------------------------------------
    BHW DASHBOARD (Supabase)
    NOTE FOR CSS:
-   - Add your styles in an external stylesheet.
+   - Add your styles in BHWDashboard.css (below).
    - Classnames here are semantic and stable for styling.
    - Keep error text ('.error-text') red.
 ---------------------------------------------------------- */
@@ -17,7 +18,7 @@ export default function BhwDashboard() {
   const [tab, setTab] = useState("Patient Registration");
   const [loadingRole, setLoadingRole] = useState(true);
 
-  // Role guard via Supabase Auth + profiles (UNCHANGED)
+  // Role guard via Supabase Auth + profiles
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -46,28 +47,21 @@ export default function BhwDashboard() {
   if (loadingRole) return null;
 
   return (
-    <div className="app app--bhw"> {/* CSS: page root layout container */}
+    <div className="app app--bhw">
       <header className="app-header">
-        {/* CSS: .app-header -> fixed top bar; brand left, action right */}
         <div className="brand">Caybiga Health Center</div>
         <button onClick={logout} className="btn btn--link btn--logout">
-          {/* CSS NAME for this button: .btn--logout */}
           Log Out
         </button>
       </header>
 
       <aside className="sidebar">
-        {/* CSS: vertical nav; padded top to account for fixed header */}
         <nav className="sidebar-nav">
           {["Patient Registration", "Patient Records"].map((item) => (
             <button
               key={item}
               onClick={() => setTab(item)}
               className={`tab-btn ${tab === item ? "tab-btn--active" : ""}`}
-              /* CSS:
-                 .tab-btn          -> base style for nav buttons
-                 .tab-btn--active  -> highlights active tab
-              */
             >
               {item}
             </button>
@@ -76,7 +70,6 @@ export default function BhwDashboard() {
       </aside>
 
       <main className="main">
-        {/* CSS: main content area with top padding for fixed header */}
         {tab === "Patient Registration" ? <PatientRegistration /> : <PatientRecords />}
       </main>
     </div>
@@ -87,7 +80,12 @@ export default function BhwDashboard() {
 function PatientRegistration() {
   const initialForm = {
     familyNumber:"", surname:"", firstName:"", middleName:"",
-    sex:"", birthdate:"", age:"", contactNumber:"", contactPerson:"",
+    sex:"", birthdate:"", age:"", contactNumber:"",
+    // Existing field (kept): this will be the Emergency Contact Number
+    contactPerson:"",
+    // NEW fields:
+    emergencyPersonName:"",   // Contact Person (name)
+    emergencyRelation:"",     // Relation
     heightCm:"", weightKg:"", bloodPressure:"", temperatureC:"",
     chiefComplaint:"", proceedToQueue:false
   };
@@ -101,7 +99,7 @@ function PatientRegistration() {
   // Cap date inputs to today
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // ---------- LIVE VALIDATIONS (UNCHANGED LOGIC) ----------
+  // ---------- LIVE VALIDATIONS ----------
   const lettersOnlyBad = (s) => /[^A-Za-z\s]/.test(s || "");
 
   const familyNumberError = useMemo(() => {
@@ -170,13 +168,23 @@ function PatientRegistration() {
     return "";
   }, [form.bloodPressure]);
 
+  // NEW: live checks for emergency name / relation (letters + spaces only)
+  const emergencyNameError = useMemo(() => {
+    if (!form.emergencyPersonName) return "";
+    return lettersOnlyBad(form.emergencyPersonName) ? "Letters and spaces only." : "";
+  }, [form.emergencyPersonName]);
+
+  const emergencyRelationError = useMemo(() => {
+    if (!form.emergencyRelation) return "";
+    return lettersOnlyBad(form.emergencyRelation) ? "Letters and spaces only." : "";
+  }, [form.emergencyRelation]);
+
   const [famLockSurname, setFamLockSurname] = useState(null);
   const [famLookupLoading, setFamLookupLoading] = useState(false);
   const norm = (s = "") => s.trim().toUpperCase();
-
   const set = (k, v) => setField(k, v);
 
-  // ----- VALIDATION (submit-time) (UNCHANGED LOGIC) -----
+  // ----- VALIDATION (submit-time) -----
   const validate = () => {
     if (!form.familyNumber.trim()) return "Family Number is required.";
     if (!form.surname.trim()) return "Surname is required.";
@@ -221,6 +229,14 @@ function PatientRegistration() {
       if (!/^\d{1,3}(?:\/\d{1,3})?$/.test(s)) return 'Blood Pressure must look like "120/80".';
     }
 
+    // NEW required checks for Emergency section
+    if (!form.emergencyPersonName.trim()) return "Emergency Contact Person is required.";
+    if (lettersOnlyBad(form.emergencyPersonName)) return "Emergency Contact Person must contain letters and spaces only.";
+    if (!form.emergencyRelation.trim()) return "Emergency Relation is required.";
+    if (lettersOnlyBad(form.emergencyRelation)) return "Emergency Relation must contain letters and spaces only.";
+    if (!form.contactPerson || String(form.contactPerson).length !== 11)
+      return "Emergency Contact Number must be exactly 11 digits.";
+
     return null;
   };
 
@@ -234,9 +250,7 @@ function PatientRegistration() {
     if (err) { alert(err); return; }
 
     if (!form.middleName.trim()) {
-      const okMiddle = window.confirm(
-        "Are you sure this patient does not have any middle name?"
-      );
+      const okMiddle = window.confirm("Are you sure this patient does not have any middle name?");
       if (!okMiddle) return;
     }
 
@@ -248,7 +262,7 @@ function PatientRegistration() {
     await submit();
   };
 
-  // Insert into public.patients (UNCHANGED)
+  // Insert into public.patients (extended payload)
   const submit = async () => {
     if (saving) return;
     const err = validate();
@@ -258,6 +272,9 @@ function PatientRegistration() {
     setNote(null);
 
     try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess?.session?.user?.id;
+
       const sexForDb =
         form.sex === "MALE" ? "MEN" :
         form.sex === "FEMALE" ? "WOMEN" :
@@ -272,12 +289,22 @@ function PatientRegistration() {
         birthdate: form.birthdate || null,
         age: form.age ? Number(form.age) : null,
         contact_number: form.contactNumber.trim() || null,
+
+        // Existing column preserved: this remains the NUMBER used in emergency section
         contact_person: form.contactPerson.trim() || null,
+
+        // NEW columns
+        emergency_contact_name: form.emergencyPersonName.trim() || null,
+        emergency_relation: form.emergencyRelation.trim() || null,
+
         height_cm: form.heightCm ? Number(form.heightCm) : null,
         weight_kg: form.weightKg ? Number(form.weightKg) : null,
         blood_pressure: form.bloodPressure.trim() || null,
         temperature_c: form.temperatureC ? Number(form.temperatureC) : null,
         chief_complaint: form.chiefComplaint.trim() || null,
+        created_by: uid || null,
+        queued: !!form.proceedToQueue,
+        queued_at: form.proceedToQueue ? new Date().toISOString() : null,
       };
 
       const { data, error } = await supabase
@@ -288,6 +315,7 @@ function PatientRegistration() {
 
       if (error) throw error;
 
+      // Create a queued record if requested, snapshot emergency fields
       if (form.proceedToQueue && data?.id) {
         const { data: existing, error: existErr } = await supabase
           .from("patient_records")
@@ -308,19 +336,19 @@ function PatientRegistration() {
               blood_pressure: payload.blood_pressure,
               temperature_c: payload.temperature_c,
               chief_complaint: payload.chief_complaint,
+
+              // NEW: emergency contact snapshot
+              emergency_contact_name: payload.emergency_contact_name || null,
+              emergency_relation: payload.emergency_relation || null,
+              emergency_contact_number: payload.contact_person || null,
+
               queued: true,
               status: "queued",
+              created_by: uid || null,
+              queued_at: new Date().toISOString()
             });
 
-          if (recErr) {
-            console.error("patient_records insert error", {
-              code: recErr.code,
-              message: recErr.message,
-              details: recErr.details,
-              hint: recErr.hint,
-            });
-            throw recErr;
-          }
+          if (recErr) throw recErr;
         }
       }
 
@@ -340,7 +368,7 @@ function PatientRegistration() {
     }
   };
 
-  // Auto-age from birthdate (UNCHANGED)
+  // Auto-age from birthdate
   useEffect(() => {
     if (!form.birthdate) return;
     const b = new Date(form.birthdate);
@@ -353,7 +381,7 @@ function PatientRegistration() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.birthdate]);
 
-  // Family number -> surname lock (UNCHANGED)
+  // Family number -> surname lock
   useEffect(() => {
     const fn = form.familyNumber.trim();
     if (!fn) { setFamLockSurname(null); return; }
@@ -391,7 +419,6 @@ function PatientRegistration() {
 
   return (
     <section className="section section--registration">
-      {/* CSS: center section width, vertical spacing */}
       <h2 className="section-title">Patient Registration</h2>
 
       <form
@@ -400,158 +427,188 @@ function PatientRegistration() {
         autoComplete="off"
         aria-busy={saving}
       >
-        {/* CSS: .form--patient-registration is the name of this form */}
+        {/* ===== Card: Patient Record ===== */}
+        <div className="card card--patient">
+          <div className="card__header">
+            <span className="card__title">Patient Record</span>
+          </div>
+          <div className="card__body">
+            <Row two>
+              <Field
+                label="Family Number"
+                value={form.familyNumber}
+                setValue={(v)=>set("familyNumber",v)}
+                required
+                hideAsterisk
+                error={familyNumberError}
+                digitsOnly
+              />
+              <Field
+                label="Surname"
+                value={form.surname}
+                setValue={(v)=>set("surname",v)}
+                required
+                hideAsterisk
+                disabled={!!famLockSurname}
+                error={surnameError}
+              />
+            </Row>
 
-        <Row two>
-          <Field
-            label="Family Number"
-            value={form.familyNumber}
-            setValue={v=>set("familyNumber",v)}
-            required
-            hideAsterisk
-            error={familyNumberError}
-            digitsOnly
-          />
-          <div>
-            <Field
-              label="Surname"
-              value={form.surname}
-              setValue={v=>set("surname",v)}
-              required
-              hideAsterisk
-              disabled={!!famLockSurname}
-              error={surnameError}
-            />
             {famLockSurname && (
               <div className="hint hint--lock">
-                {/* CSS: subtle info text */}
                 This Family Number is linked to <span className="hint-strong">"{famLockSurname}"</span>. Surname is locked.
               </div>
             )}
             {!famLockSurname && famLookupLoading && (
               <div className="hint">Checking family mapping...</div>
             )}
+
+            <Row two>
+              <Field
+                label="First Name"
+                value={form.firstName}
+                setValue={(v)=>set("firstName",v)}
+                required
+                hideAsterisk
+                error={firstNameError}
+              />
+              <Field
+                label="Extension"
+                value={form.middleName}
+                setValue={(v)=>set("middleName",v)}
+                error={middleNameError}
+              />
+            </Row>
+
+            <Row two>
+              <Select
+                label="Sex"
+                value={form.sex}
+                onChange={(v)=>set("sex",v)}
+                options={["MALE","FEMALE","OTHER"]}
+                required
+                hideAsterisk
+              />
+              <Field
+                label="Birthdate"
+                type="date"
+                value={form.birthdate}
+                setValue={(v)=>set("birthdate",v)}
+                required
+                hideAsterisk
+                max={todayISO}
+                error={birthdateError}
+              />
+            </Row>
+
+            <Row two>
+              <Field
+                label="Age"
+                type="number"
+                value={form.age}
+                setValue={(v)=>set("age",v)}
+                required
+                hideAsterisk
+                min={0}
+                max={120}
+                error={ageError}
+              />
+              <Field
+                label="Contact Number"
+                value={form.contactNumber}
+                setValue={(v)=>set("contactNumber",v)}
+                digitsOnly
+                digitsOnlyExact={11}
+              />
+            </Row>
+
+            {isInfant && (
+              <div className="note note--info note--compact">
+                Age based on birthdate: {infantMonths} month{infantMonths === 1 ? "" : "s"}
+              </div>
+            )}
+
+            <div className="subsection">
+              <div className="subsection__title">In case of Emergency</div>
+              <Row two>
+                <Field
+                  label="Contact Person"
+                  value={form.emergencyPersonName}
+                  setValue={(v)=>set("emergencyPersonName",v)}
+                  required
+                  hideAsterisk
+                  error={emergencyNameError}
+                />
+                <Field
+                  label="Relation"
+                  value={form.emergencyRelation}
+                  setValue={(v)=>set("emergencyRelation",v)}
+                  required
+                  hideAsterisk
+                  error={emergencyRelationError}
+                />
+              </Row>
+              <Field
+                label="Contact Number"
+                value={form.contactPerson}          // existing key, kept (NUMBER)
+                setValue={(v)=>set("contactPerson",v)}
+                digitsOnly
+                digitsOnlyExact={11}
+                required
+                hideAsterisk
+              />
+            </div>
           </div>
-        </Row>
+        </div>
 
-        <Row two>
-          <Field
-            label="First Name"
-            value={form.firstName}
-            setValue={v=>set("firstName",v)}
-            required
-            hideAsterisk
-            error={firstNameError}
-          />
-          <Field
-            label="Middle Name"
-            value={form.middleName}
-            setValue={v=>set("middleName",v)}
-            error={middleNameError}
-          />
-        </Row>
-        <Row two>
-          <Select
-            label="Sex"
-            value={form.sex}
-            onChange={v=>set("sex",v)}
-            options={["MALE","FEMALE","OTHER"]}
-            required
-            hideAsterisk
-          />
-          <Field
-            label="Birthdate"
-            type="date"
-            value={form.birthdate}
-            setValue={v=>set("birthdate",v)}
-            required
-            hideAsterisk
-            max={todayISO}
-            error={birthdateError}
-          />
-        </Row>
-
-        <Row two>
-          <Field
-            label="Age"
-            type="number"
-            value={form.age}
-            setValue={v=>set("age",v)}
-            required
-            hideAsterisk
-            min={0}
-            max={120}
-            error={ageError}
-          />
-          <Field
-            label="Contact Number"
-            value={form.contactNumber}
-            setValue={v=>set("contactNumber",v)}
-            digitsOnly
-            digitsOnlyExact={11}
-          />
-        </Row>
-
-        {isInfant && (
-          <div className="note note--info note--compact">
-            {/* CSS: small muted text */}
-            Age based on birthdate: {infantMonths} month{infantMonths === 1 ? "" : "s"}
+        {/* ===== Card: Nurse's Notes ===== */}
+        <div className="card card--notes">
+          <div className="card__header">
+            <span className="card__title">Nurse’s Notes</span>
           </div>
-        )}
+          <div className="card__body">
+            <div className="stack">
+              <Field
+                label="Height"
+                value={form.heightCm}
+                setValue={(v)=>set("heightCm",v)}
+                oneDecimal
+                placeholder="e.g. 170.0"
+              />
+              <Field
+                label="Weight"
+                value={form.weightKg}
+                setValue={(v)=>set("weightKg",v)}
+                oneDecimal
+                placeholder="e.g. 59.0"
+              />
+              <Field
+                label="Blood Pressure"
+                value={form.bloodPressure}
+                setValue={(v)=>set("bloodPressure",v)}
+                placeholder="e.g. 120/80"
+                error={bpError}
+              />
+              <Field
+                label="Temperature"
+                value={form.temperatureC}
+                setValue={(v)=>set("temperatureC",v)}
+                oneDecimal
+                placeholder="e.g. 36.8"
+              />
+            </div>
 
-        <Field
-          label="Contact Person"
-          value={form.contactPerson}
-          setValue={v=>set("contactPerson",v)}
-          digitsOnly
-          digitsOnlyExact={11}
-        />
-
-        <div className="separator" /> {/* CSS: horizontal rule substitute */}
-
-        <Row two>
-          <Field
-            label="Height (cm)"
-            value={form.heightCm}
-            setValue={v=>set("heightCm",v)}
-            oneDecimal
-            placeholder="e.g. 172.4"
-          />
-          <Field
-            label="Weight (kg)"
-            value={form.weightKg}
-            setValue={v=>set("weightKg",v)}
-            oneDecimal
-            placeholder="e.g. 83.0"
-          />
-        </Row>
-        <Row two>
-          <Field
-            label="Blood Pressure"
-            value={form.bloodPressure}
-            setValue={v=>set("bloodPressure",v)}
-            placeholder="e.g. 120/80"
-            error={bpError}
-          />
-          <Field
-            label="Temperature (°C)"
-            value={form.temperatureC}
-            setValue={v=>set("temperatureC",v)}
-            oneDecimal
-            placeholder="e.g. 37.5"
-          />
-        </Row>
-
-        <div className="field-group">
-          {/* CSS: block for textarea */}
-          <label className="label">Chief Complaint:</label>
-          <textarea
-            className="textarea"
-            value={form.chiefComplaint}
-            onChange={e=>set("chiefComplaint", e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-          />
+            <div className="field-group">
+              <label className="label">Chief Complaint:</label>
+              <textarea
+                className="textarea textarea--complaint"
+                value={form.chiefComplaint}
+                onChange={(e)=>set("chiefComplaint", e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+          </div>
         </div>
 
         <label className="checkbox">
@@ -559,25 +616,33 @@ function PatientRegistration() {
             type="checkbox"
             className="checkbox-input"
             checked={form.proceedToQueue}
-            onChange={e=>set("proceedToQueue", e.target.checked)}
+            onChange={(e)=>set("proceedToQueue", e.target.checked)}
             required
           />
           <span className="checkbox-label">Proceed to Queuing</span>
-          {/* CSS: this checkbox must be visibly required */}
         </label>
 
-        <button
-          type="submit"
-          className="btn btn--primary btn--submit"
-          disabled={saving || !canSubmit}
-          title={!canSubmit ? "Complete required fields to enable submit" : ""}
-        >
-          {saving ? "Saving..." : "Submit"}
-        </button>
+        <div className="form-actions">
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={clearForm}
+            disabled={saving}
+          >
+            Discard
+          </button>
+          <button
+            type="submit"
+            className="btn btn--primary btn--submit"
+            disabled={saving || !canSubmit}
+            title={!canSubmit ? "Complete required fields to enable submit" : ""}
+          >
+            {saving ? "Saving..." : "Save Chart"}
+          </button>
+        </div>
 
         {note && (
           <div className={`note ${note.type === "success" ? "note--success" : "note--error"}`}>
-            {/* Keep error text red via .note--error */}
             {note.msg}
           </div>
         )}
@@ -587,13 +652,8 @@ function PatientRegistration() {
 }
 
 /* ---------------- LAYOUT HELPERS (STRUCTURE ONLY) ---------------- */
-
 const Row = ({two=false, children}) => (
   <div className={`row ${two ? "row--two" : ""}`}>
-    {/* CSS:
-       .row         -> vertical spacing between fields
-       .row--two    -> 2-column grid on wider screens, 1-col on mobile
-    */}
     {children}
   </div>
 );
@@ -653,7 +713,6 @@ function Field({
 
   return (
     <div className="field">
-      {/* CSS: .field is the container; stack label + input + messages */}
       <label className="label">
         {label}{required && !hideAsterisk && <span className="required-asterisk"> *</span>}:
       </label>
@@ -683,17 +742,9 @@ function Field({
         }
       />
       {showLenError && (
-        <div className="error-text">
-          {/* CSS: keep this red */}
-          Must be exactly {exactLen} digits.
-        </div>
+        <div className="error-text">Must be exactly {exactLen} digits.</div>
       )}
-      {!!error && (
-        <div className="error-text">
-          {/* CSS: keep this red */}
-          {error}
-        </div>
-      )}
+      {!!error && <div className="error-text">{error}</div>}
     </div>
   );
 }
@@ -705,7 +756,6 @@ function Select({ label, value, onChange, options, required = false, hideAsteris
         {label}{required && !hideAsterisk && <span className="required-asterisk"> *</span>}:
       </label>
       <div className="select">
-        {/* CSS: style the wrapper; add custom arrow using .select-caret if desired */}
         <select
           className="select-input"
           value={value}
@@ -718,7 +768,6 @@ function Select({ label, value, onChange, options, required = false, hideAsteris
           ))}
         </select>
         <span className="select-caret">v</span>
-        {/* CSS: position this caret on the right inside select */}
       </div>
     </div>
   );
@@ -727,7 +776,7 @@ function Select({ label, value, onChange, options, required = false, hideAsteris
 /* ---------------- Patient Records ---------------- */
 function PatientRecords() {
   const [q, setQ] = useState("");
-  const [items, setItems] = useState([]); // <-- fixed (was "the [items, setItems]")
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const firstRun = useRef(false);
@@ -780,11 +829,9 @@ function PatientRecords() {
 
   return (
     <section className="section section--records">
-      {/* CSS: center section width */}
       <h2 className="section-title">Patient Records</h2>
 
       <div className="toolbar">
-        {/* CSS: horizontal layout for search + button */}
         <input
           className="input input--search"
           placeholder="Search by Family No. or Surname..."
@@ -797,24 +844,18 @@ function PatientRecords() {
           onClick={() => void load()}
           disabled={loading}
         >
-          {/* CSS NAME for this button: .btn--secondary */}
           {loading ? "Loading..." : "Refresh"}
         </button>
       </div>
 
-      {err && (
-        <div className="alert alert--error">{err}</div>
-        /* CSS: .alert--error should be red background with red/dark text */
-      )}
+      {err && <div className="alert alert--error">{err}</div>}
 
       <div className="family-list">
-        {/* CSS: vertical list; center items on narrow screens */}
         {items.map((row) => (
           <Link
             key={`${row.family_number}-${row.surname}`}
             to={`/bhw/family/${encodeURIComponent(row.family_number)}`}
             className="family-list__item"
-            /* CSS NAME for these items: .family-list__item */
           >
             {row.family_number} - {row.surname}
           </Link>
@@ -822,7 +863,6 @@ function PatientRecords() {
 
         {items.length === 0 && !loading && (
           <div className="empty">No families found.</div>
-          /* CSS: muted, centered small text */
         )}
       </div>
     </section>

@@ -6,6 +6,7 @@ import BhwDashboard from "./apps/BhwDashboard";
 import BhwFamily from "./apps/BhwFamily";
 import DoctorDashboard from "./apps/DoctorDashboard";
 import AdminApp from "./apps/admin/AdminApp";
+import NurseDashboard from "./apps/nurse/NurseDashboard"; // NEW
 
 export default function App() {
   return (
@@ -41,6 +42,16 @@ export default function App() {
           element={
             <RequireAuth role="Doctor">
               <DoctorDashboard />
+            </RequireAuth>
+          }
+        />
+
+        {/* Protected: Nurse (enum value is 'Nurse') */}
+        <Route
+          path="/nurse"
+          element={
+            <RequireAuth role="Nurse">
+              <NurseDashboard />
             </RequireAuth>
           }
         />

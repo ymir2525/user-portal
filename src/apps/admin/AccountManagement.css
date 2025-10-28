@@ -159,3 +159,4 @@ body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif
 .toast--error{ background: var(--red-50); color:#b91c1c; border-color:#fecaca; }
 .toast--success{ background: var(--green-50); color:#047857; border-color:#bbf7d0; }
 .toast--info{ background:#f9fafb; color:#374151; border-color:#e5e7eb; }
+modal-overlay { position: fixed; inset: 0; z-index: 9999; }

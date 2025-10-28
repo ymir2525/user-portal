@@ -220,6 +220,9 @@ export default function DoctorDashboard() {
 
       if (error) throw error;
 
+      // NOTE: Do NOT touch patients.queued / patients.queued_at anymore.
+      // That way AdminDashboard's "Total Check Up (today)" never decrements.
+
       setQueue((q) => q.filter((x) => x.record_id !== active.record_id));
       setActive(null);
       setBanner({ type: "ok", msg: "Chart saved. Patient removed from queue." });
