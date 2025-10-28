@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { dateOnly } from "../lib/utils";
 import { supabase } from "../lib/supabase";
+import "./BhwFamily.css";
 
 export default function BhwFamily() {
   const { familyNumber } = useParams();
@@ -22,71 +23,146 @@ export default function BhwFamily() {
   const [patient, setPatient] = useState(null);
   const [records, setRecords] = useState([]);
 
-  // ---------- NEW: past-record subviews ----------
-  // When user clicks a row in “Past Records”, we open a tiny sub-router.
+  // past-record subviews
   const [pastView, setPastView] = useState("list"); // 'list' | 'detail' | 'chart' | 'docs'
   const [selectedPast, setSelectedPast] = useState(null);
 
-  // New-record form state
-  const [form, setForm] = useState({
-    heightCm: "", weightKg: "", bloodPressure: "", temperatureC: "",
-    chiefComplaint: "", proceedToQueue: false
-  });
-  const setField = (k, v) => {
-    setForm(s => ({ ...s, [k]: v }));
-    setErrors(prev => ({ ...prev, [k]: undefined, _form: undefined }));
-    setErr("");
+  // Helper: Manila "today" (YYYY-MM-DD)
+  const manilaTodayDate = () => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const y = parts.find(p => p.type === "year").value;
+    const m = parts.find(p => p.type === "month").value;
+    const d = parts.find(p => p.type === "day").value;
+    return `${y}-${m}-${d}`;
   };
 
-  // === validation helpers ===
+  // --- New-record form state (now includes emergency contact fields) ---
+  const [form, setForm] = useState({
+    heightCm: "", weightKg: "", bloodPressure: "", temperatureC: "",
+    chiefComplaint: "",
+    // NEW (snapshot for this record):
+    emergencyName: "",
+    emergencyRelation: "",
+    emergencyNumber: "",
+    proceedToQueue: true // QUEUE BY DEFAULT
+  });
+
+  // === validation (original + emergency fields) ===
   const validate = useCallback((f) => {
     const errs = {};
     const trimmedCC = (f.chiefComplaint || "").trim();
 
-    // All fields required before adding a new record
+    // Required vitals
     if (!f.heightCm) errs.heightCm = "Required.";
     if (!f.weightKg) errs.weightKg = "Required.";
     if (!f.bloodPressure) errs.bloodPressure = "Required.";
     if (!f.temperatureC) errs.temperatureC = "Required.";
     if (!trimmedCC) errs.chiefComplaint = "Required.";
 
-    const numIn = (v) => (v === "" || v == null ? null : Number(v));
-    const h = numIn(f.heightCm);
-    const w = numIn(f.weightKg);
-    const t = numIn(f.temperatureC);
+    const toNum = (v) => (v === "" || v == null ? null : Number(v));
+    const onlyDigits = (s) => (s || "").replace(/\D/g, "");
+    const lettersOnlyBad = (s) => /[^A-Za-z\s]/.test(s || "");
 
-    const oneDec = /^\d+(\.\d)?$/;
+    // Height: up to 5 digits total; 1 decimal
+    if (f.heightCm) {
+      const hTxt = String(f.heightCm);
+      const hDigits = onlyDigits(hTxt);
+      const hasOneDot = (hTxt.match(/\./g) || []).length <= 1;
+      const decOk = /^\d+(\.\d)?$/.test(hTxt) || /^\d+\.$/.test(hTxt);
+      if (hDigits.length === 0 || hDigits.length > 5 || !hasOneDot || !decOk) {
+        errs.heightCm = "Height must be up to 5 digits, optional 1 decimal (e.g., 163.6).";
+      }
+      const h = toNum(hTxt.endsWith(".") ? hTxt.slice(0, -1) : hTxt);
+      if (h == null || isNaN(h)) errs.heightCm = errs.heightCm || "Invalid number.";
+      else if (h < 30 || h > 300) errs.heightCm = "Height must be 30–300 cm.";
+    }
 
-    if (h == null || isNaN(h)) errs.heightCm = errs.heightCm || "Invalid number.";
-    if (w == null || isNaN(w)) errs.weightKg = errs.weightKg || "Invalid number.";
-    if (t == null || isNaN(t)) errs.temperatureC = errs.temperatureC || "Invalid number.";
+    // Weight: up to 4 digits total; up to 2 decimals
+    if (f.weightKg) {
+      const wTxt = String(f.weightKg);
+      const wDigits = onlyDigits(wTxt);
+      const hasOneDot = (wTxt.match(/\./g) || []).length <= 1;
+      const decOk = /^\d+(\.\d{0,2})?$/.test(wTxt) || /^\d+\.$/.test(wTxt);
+      if (wDigits.length === 0 || wDigits.length > 4 || !hasOneDot || !decOk) {
+        errs.weightKg = "Weight must be up to 4 digits total; up to 2 decimals (e.g., 53.7 or 53.72).";
+      }
+      const w = toNum(wTxt.endsWith(".") ? wTxt.slice(0, -1) : wTxt);
+      if (w == null || isNaN(w)) errs.weightKg = errs.weightKg || "Invalid number.";
+      else if (w <= 0 || w > 500) errs.weightKg = "Weight must be 1–500 kg.";
+    }
 
-    if (h != null && (h < 30 || h > 300)) errs.heightCm = "Height must be 30–300 cm.";
-
-    if (f.weightKg && !oneDec.test(f.weightKg)) errs.weightKg = "Use at most 1 decimal (e.g., 42.7).";
-    if (w != null && (w <= 0 || w > 500)) errs.weightKg = "Weight must be 1–500 kg.";
-
-    if (f.temperatureC && !oneDec.test(f.temperatureC)) errs.temperatureC = "Use at most 1 decimal (e.g., 37.5).";
-    if (t != null && (t < 30 || t > 45)) errs.temperatureC = "Temperature must be 30–45 °C.";
-
+    // Blood pressure
     if (f.bloodPressure) {
-      const m = f.bloodPressure.trim().match(/^(\d{2,3})\s*\/\s*(\d{2,3})(\s*(mmHg)?)?$/i);
+      const bp = String(f.bloodPressure).trim();
+      const m = bp.match(/^(\d{1,4})\/(\d{1,4})$/);
       if (!m) {
-        errs.bloodPressure = errs.bloodPressure || "BP must be like 120/80.";
+        errs.bloodPressure = "BP must look like 120/80.";
       } else {
-        const sys = Number(m[1]), dia = Number(m[2]);
-        if (sys < dia) errs.bloodPressure = "Systolic should be ≥ diastolic.";
-        if (sys < 70 || sys > 260 || dia < 40 || dia > 160)
-          errs.bloodPressure = "BP values look out of range.";
+        const left = m[1], right = m[2];
+        if (left.length >= 4 || right.length >= 4) {
+          errs.bloodPressure = "4 digits in blood pressure is not possible. Please make sure you input the correct BP.";
+        } else {
+          const sys = Number(left), dia = Number(right);
+          if (isNaN(sys) || isNaN(dia)) {
+            errs.bloodPressure = "BP must be numbers like 120/80.";
+          } else if (sys < dia) {
+            errs.bloodPressure = "Systolic should be ≥ diastolic.";
+          }
+          if (!errs.bloodPressure && (sys < 70 || sys > 260 || dia < 40 || dia > 160)) {
+            errs.bloodPressure = "BP values look out of range.";
+          }
+        }
       }
     }
 
-    if (trimmedCC.length > 1000)
-      errs.chiefComplaint = "Keep under 1000 characters.";
+    // Temperature: up to 4 digits total; up to 2 decimals
+    if (f.temperatureC) {
+      const tTxt = String(f.temperatureC);
+      const tDigits = onlyDigits(tTxt);
+      const hasOneDot = (tTxt.match(/\./g) || []).length <= 1;
+      const decOk = /^\d+(\.\d{0,2})?$/.test(tTxt) || /^\d+\.$/.test(tTxt);
+      if (tDigits.length === 0 || tDigits.length > 4 || !hasOneDot || !decOk) {
+        errs.temperatureC = "Temperature must be up to 4 digits total; up to 2 decimals (e.g., 43.7 or 43.68).";
+      }
+      const t = Number(tTxt.endsWith(".") ? tTxt.slice(0, -1) : tTxt);
+      if (t == null || isNaN(t)) errs.temperatureC = errs.temperatureC || "Invalid number.";
+      else if (t < 30 || t > 45) errs.temperatureC = "Temperature must be 30–45 °C.";
+    }
 
-    if (Object.keys(errs).length) errs._form = "Please fill in all fields correctly before submitting.";
+    if (trimmedCC.length > 1000) errs.chiefComplaint = "Keep under 1000 characters.";
+
+    // --- NEW: Emergency contact required + masks (match Dashboard) ---
+    if (!f.emergencyName || !f.emergencyName.trim()) {
+      errs.emergencyName = "Required.";
+    } else if (lettersOnlyBad(f.emergencyName)) {
+      errs.emergencyName = "Letters and spaces only.";
+    }
+    if (!f.emergencyRelation || !f.emergencyRelation.trim()) {
+      errs.emergencyRelation = "Required.";
+    } else if (lettersOnlyBad(f.emergencyRelation)) {
+      errs.emergencyRelation = "Letters and spaces only.";
+    }
+    const num = onlyDigits(f.emergencyNumber);
+    if (!num || num.length !== 11) {
+      errs.emergencyNumber = "Must be exactly 11 digits.";
+    }
+
+    if (Object.keys(errs).length) errs._form = "Please fix the highlighted fields.";
     return errs;
   }, []);
+
+  // Realtime validation while typing
+  const setField = (k, v) => {
+    const next = { ...form, [k]: v };
+    setForm(next);
+    setErrors(validate(next));
+    setErr("");
+  };
 
   const canSubmit = useMemo(() => Object.keys(validate(form)).length === 0, [form, validate]);
 
@@ -94,7 +170,6 @@ export default function BhwFamily() {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      // auth guard
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess?.session?.user?.id;
       if (!uid) { nav("/login", { replace: true }); return; }
@@ -109,11 +184,9 @@ export default function BhwFamily() {
 
       try {
         setLoading(true); setErr("");
-
-        // load family members from patients table
         const { data, error } = await supabase
           .from("patients")
-          .select("*")
+          .select("id, first_name, middle_name, surname, sex, age, birthdate, family_number, created_at, contact_number, contact_person, emergency_contact_name, emergency_relation")
           .eq("family_number", familyNumber)
           .order("created_at", { ascending: false });
 
@@ -182,18 +255,40 @@ export default function BhwFamily() {
     try {
       setSaving(true);
 
+      // who is inserting (for RLS visibility)?
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess?.session?.user?.id || null;
+
       const num = (v) => (v === "" || v == null ? null : Number(v));
+      const trim = (s) => (s || "").trim();
+      const onlyDigits = (s) => (s || "").replace(/\D/g, "");
+      const willQueue = !!form.proceedToQueue;
+
       const payload = {
         patient_id: patient.id,
-        height_cm: num(form.heightCm),
-        weight_kg: num(form.weightKg),
-        blood_pressure: form.bloodPressure || null,
-        temperature_c: num(form.temperatureC),
-        chief_complaint: (form.chiefComplaint || "").trim() || null,
-        queued: !!form.proceedToQueue,
+
+        // vitals
+        height_cm: num(form.heightCm.endsWith(".") ? form.heightCm.slice(0, -1) : form.heightCm),
+        weight_kg: num(form.weightKg.endsWith(".") ? form.weightKg.slice(0, -1) : form.weightKg),
+        blood_pressure: trim(form.bloodPressure) || null,
+        temperature_c: num(form.temperatureC.endsWith(".") ? form.temperatureC.slice(0, -1) : form.temperatureC),
+        chief_complaint: trim(form.chiefComplaint) || null,
+
+        // snapshot emergency contact (NEW)
+        emergency_contact_name: trim(form.emergencyName) || null,
+        emergency_relation: trim(form.emergencyRelation) || null,
+        emergency_contact_number: onlyDigits(form.emergencyNumber) || null,
+
+        // queue flags
+        visit_date: manilaTodayDate(),
+        queued: true,
+        status: "queued",
+        queued_at: new Date().toISOString(),
+
+        created_by: uid,
       };
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("patient_records")
         .insert(payload)
         .select()
@@ -201,7 +296,15 @@ export default function BhwFamily() {
 
       if (error) throw error;
 
-      // reload past records quickly
+      // also flag the PATIENT as queued now
+      if (willQueue) {
+        await supabase
+          .from("patients")
+          .update({ queued: true, queued_at: new Date().toISOString() })
+          .eq("id", patient.id);
+      }
+
+      // reload patient’s records
       const { data: recs } = await supabase
         .from("patient_records")
         .select("*")
@@ -210,9 +313,14 @@ export default function BhwFamily() {
 
       setRecords(Array.isArray(recs) ? recs : []);
 
+      // reset form
       setForm({
         heightCm: "", weightKg: "", bloodPressure: "", temperatureC: "",
-        chiefComplaint: "", proceedToQueue: false
+        chiefComplaint: "",
+        emergencyName: patient?.emergency_contact_name || "",
+        emergencyRelation: patient?.emergency_relation || "",
+        emergencyNumber: patient?.contact_person || "",
+        proceedToQueue: true
       });
       setErrors({});
       setMode("patient");
@@ -224,7 +332,7 @@ export default function BhwFamily() {
     }
   };
 
-  // Helper: compute age if missing, from birthdate
+  // compute age
   const computedAge = useMemo(() => {
     const bd = patient?.birthdate;
     if (!bd) return patient?.age ?? "";
@@ -237,92 +345,112 @@ export default function BhwFamily() {
     return age;
   }, [patient]);
 
+  // Prefill emergency fields when switching to "new"
+  useEffect(() => {
+    if (mode === "new" && patient) {
+      setForm((prev) => ({
+        ...prev,
+        emergencyName: patient.emergency_contact_name || "",
+        emergencyRelation: patient.emergency_relation || "",
+        emergencyNumber: patient.contact_person || "",
+      }));
+      setErrors({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, patient?.id]);
+
   return (
-    <div className="min-h-screen p-6">
+    <div className="family-page">
       {/* top bar: back and logout */}
-      <div className="flex items-center justify-between mb-4">
-        <Link to="/bhw" className="text-sm underline">← Back to Records</Link>
-        <button onClick={logout} className="text-sm underline">Log Out</button>
+      <div className="topbar">
+        <Link to="/bhw" className="link link--small">← Back to Records</Link>
+        <button onClick={logout} className="link link--small">Log Out</button>
       </div>
 
-      <h2 className="text-center text-orange-600 font-semibold mb-4">
-        Family: {familyNumber}
-      </h2>
+      <h2 className="page-title page-title--family">Family: {familyNumber}</h2>
 
-      {loading && <div className="text-center text-sm">Loading…</div>}
-      {err && <div className="text-center text-sm text-red-600">{err}</div>}
+      {loading && <div className="status status--loading">Loading…</div>}
+      {err && <div className="error-text text-center">{err}</div>}
 
       {!loading && !err && (
         <>
           {mode === "members" && (
-            <div className="w-full space-y-2">
+            <div className="member-list">
               {members.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => openPatient(m.id)}
-                  className="block mx-auto w-[420px] sm:w-[460px] border border-gray-600 rounded px-3 py-2 hover:bg-orange-50 text-left"
+                  className="member-card"
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <span className="font-semibold">
+                  <div className="member-card__row">
+                    <div className="member-card__main">
+                      <span className="member-card__name">
                         {m.first_name} {m.middle_name ? `${m.middle_name} ` : ""}{m.surname}
                       </span>
-                      <span className="text-xs text-gray-600">
+                      <span className="member-card__meta">
                         {" "}• {m.sex} • {m.age} Years Old
                       </span>
                     </div>
-                    <div className="text-xs text-gray-700">{dateOnly(m.birthdate)}</div>
+                    <div className="member-card__date">{dateOnly(m.birthdate)}</div>
                   </div>
                 </button>
               ))}
 
               {members.length === 0 && (
-                <div className="text-center text-sm text-gray-500">No members found.</div>
+                <div className="empty">No members found.</div>
               )}
             </div>
           )}
 
           {mode === "patient" && patient && (
-            <div className="max-w-5xl mx-auto">
+            <div className="patient-wrap">
               {/* header with + New Record */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-semibold">
+              <div className="patient-head">
+                <div className="patient-name">
                   {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
                 </div>
                 <button
                   onClick={() => { setMode("new"); setErrors({}); setErr(""); }}
-                  className="px-3 py-1 rounded bg-green-200 hover:bg-green-300 text-sm"
+                  className="btn btn--accent"
                 >
                   + New Record
                 </button>
               </div>
 
-              <div className="text-sm space-y-1 mb-4">
-                <div><strong>Family Number:</strong> {patient.family_number}</div>
-                <div><strong>Sex:</strong> {patient.sex || "-"}</div>
-                <div className="text-sm"><span className="font-semibold">Birthdate:</span> {dateOnly(patient.birthdate)}</div>
-                <div><strong>Age:</strong> {computedAge || "-"}</div>
-                <div><strong>Contacts:</strong> {patient.contact_number || "-"}</div>
+              {/* Meta summary (now shows emergency details like screenshot) */}
+              <div className="patient-meta">
+                <div><strong>Birthdate:</strong> {dateOnly(patient.birthdate) || "—"}</div>
+                <div><strong>Age:</strong> {computedAge || "—"} yrs old</div>
+                <div><strong>Sex:</strong> {patient.sex || "—"}</div>
+                <div><strong>Contact Number:</strong> {patient.contact_number || "—"}</div>
+                <div className="patient-emergency">
+                  <strong>Contact Person:</strong> {patient.emergency_contact_name || "—"}
+                  {" "} | <strong>Contact Number:</strong> {patient.contact_person || "—"}
+                  {" "} | <strong>Relation:</strong> {patient.emergency_relation || "—"}
+                </div>
+                <div className="patient-right">
+                  <strong>Fam {patient.family_number || "—"}</strong>
+                </div>
               </div>
 
-              {/* ---------- Past Records (clickable) ---------- */}
+              {/* Past Records */}
               {pastView === "list" && (
                 <>
-                  <div className="text-sm font-semibold mb-1">Past Records</div>
-                  <div className="space-y-2">
+                  <div className="subhead">Past Records</div>
+                  <div className="record-list">
                     {records.length === 0 && (
-                      <div className="text-gray-500 text-sm">No past records found.</div>
+                      <div className="empty">No past records found.</div>
                     )}
                     {records.map(r => (
                       <button
                         key={r.id}
                         onClick={() => { setSelectedPast(r); setPastView("detail"); }}
-                        className="w-full text-left border rounded px-3 py-2 hover:bg-orange-50"
+                        className="record-item"
                       >
-                        <div className="font-medium">
+                        <div className="record-item__title">
                           {dateOnly(r.completed_at || r.visit_date || r.created_at)}
                         </div>
-                        <div className="text-xs text-gray-600">
+                        <div className="record-item__meta">
                           H: {r.height_cm ?? "—"} cm • W: {r.weight_kg ?? "—"} kg • BP: {r.blood_pressure ?? "—"} •
                           Temp: {r.temperature_c ?? "—"} °C • CC: {r.chief_complaint || "—"}
                         </div>
@@ -330,10 +458,10 @@ export default function BhwFamily() {
                     ))}
                   </div>
 
-                  <div className="mt-6">
+                  <div className="actions actions--back">
                     <button
                       onClick={() => setMode("members")}
-                      className="px-4 py-2 rounded bg-orange-500 text-white hover:bg-orange-600"
+                      className="btn btn--primary"
                     >
                       Back
                     </button>
@@ -341,7 +469,6 @@ export default function BhwFamily() {
                 </>
               )}
 
-              {/* ---------- Past Record: Detail menu ---------- */}
               {pastView === "detail" && selectedPast && (
                 <PastDetail
                   rec={selectedPast}
@@ -352,7 +479,6 @@ export default function BhwFamily() {
                 />
               )}
 
-              {/* ---------- Past Record: Chart view ---------- */}
               {pastView === "chart" && selectedPast && (
                 <PastChartViewLite
                   rec={selectedPast}
@@ -361,7 +487,6 @@ export default function BhwFamily() {
                 />
               )}
 
-              {/* ---------- Past Record: Documents view ---------- */}
               {pastView === "docs" && selectedPast && (
                 <PastDocumentsViewLite
                   rec={selectedPast}
@@ -372,75 +497,133 @@ export default function BhwFamily() {
           )}
 
           {mode === "new" && patient && (
-            <div className="max-w-4xl mx-auto">
-              <h3 className="text-center text-2xl font-semibold mb-4">
+            <div className="new-record">
+              <h3 className="page-title page-title--sub">
                 New Record for {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
               </h3>
 
-              <form onSubmit={submitNewRecord} className="bg-orange-50 border border-orange-200 rounded-xl p-5">
-                {/* Prefilled read-only fields */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm mb-1">Patient Name:</label>
-                    <input className="w-full border rounded px-3 py-2 bg-gray-100" readOnly
-                      value={`${patient.first_name} ${patient.middle_name ? patient.middle_name + " " : ""}${patient.surname}`} />
+              <form onSubmit={submitNewRecord} className="form form--new-record">
+                {/* ===== Card: Patient Record (summary + emergency fields) ===== */}
+                <div className="card">
+                  <div className="card__title">Patient Record</div>
+                  <div className="row row--two">
+                    <div className="field">
+                      <label className="label">Patient Name:</label>
+                      <input
+                        className="input input--readonly"
+                        readOnly
+                        value={`${patient.first_name} ${patient.middle_name ? patient.middle_name + " " : ""}${patient.surname}`}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="label">Family Number:</label>
+                      <input
+                        className="input input--readonly"
+                        readOnly
+                        value={patient.family_number || ""}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm mb-1">Family Number:</label>
-                    <input className="w-full border rounded px-3 py-2 bg-gray-100" readOnly
-                      value={patient.family_number || ""} />
+
+                  <div className="row row--two">
+                    <div className="field">
+                      <label className="label">Age:</label>
+                      <input
+                        className="input input--readonly"
+                        readOnly
+                        value={computedAge || ""}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="label">Birthdate:</label>
+                      <input
+                        className="input input--readonly"
+                        readOnly
+                        value={dateOnly(patient.birthdate) || ""}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="subsection">
+                    <div className="subsection__title">In case of Emergency</div>
+                    <div className="row row--two">
+                      <TextField
+                        label="Contact Person"
+                        value={form.emergencyName}
+                        onChange={(v)=>setField("emergencyName", v)}
+                        placeholder="Enter full name"
+                        error={errors.emergencyName}
+                      />
+                      <TextField
+                        label="Relation"
+                        value={form.emergencyRelation}
+                        onChange={(v)=>setField("emergencyRelation", v)}
+                        placeholder="e.g., Wife"
+                        error={errors.emergencyRelation}
+                      />
+                    </div>
+                    <DigitsField
+                      label="Contact Number"
+                      value={form.emergencyNumber}
+                      onChange={(v)=>setField("emergencyNumber", v)}
+                      exactLen={11}
+                      placeholder="09123456789"
+                      error={errors.emergencyNumber}
+                    />
                   </div>
                 </div>
 
-                <div className="mt-3">
-                  <label className="block text-sm mb-1">Age:</label>
-                  <input className="w-full md:w-1/3 border rounded px-3 py-2 bg-gray-100" readOnly
-                    value={computedAge || ""} />
+                {/* ===== Card: Nurse’s Notes (stacked like screenshot) ===== */}
+                <div className="card">
+                  <div className="card__title">Nurse’s Notes</div>
+
+                  <div className="stack">
+                    <Field label="Height (cm)" value={form.heightCm} onChange={v => setField("heightCm", v)} mode="height" placeholder="e.g. 163.6" error={errors.heightCm} />
+                    <Field label="Weight (kg)" value={form.weightKg} onChange={v => setField("weightKg", v)} mode="weight" placeholder="e.g. 53.72" error={errors.weightKg} />
+                    <Field label="Blood Pressure" value={form.bloodPressure} onChange={v => setField("bloodPressure", v)} mode="bp" placeholder="e.g. 120/80" error={errors.bloodPressure} />
+                    <Field label="Temperature (°C)" value={form.temperatureC} onChange={v => setField("temperatureC", v)} mode="temp" placeholder="e.g. 36.8" error={errors.temperatureC} />
+                  </div>
+
+                  <div className="field">
+                    <label className="label">Chief Complaint:</label>
+                    <textarea
+                      className={`textarea ${errors.chiefComplaint ? 'has-error' : ''}`}
+                      value={form.chiefComplaint}
+                      onChange={e => setField("chiefComplaint", e.target.value)}
+                    />
+                    {errors.chiefComplaint && (
+                      <div className="error-text">{errors.chiefComplaint}</div>
+                    )}
+                  </div>
                 </div>
 
-                <hr className="my-4 border-orange-200" />
-
-                {/* Editable vitals */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <Field label="Height (cm)" value={form.heightCm} onChange={v => setField("heightCm", v)} digitsOnly error={errors.heightCm} />
-                  <Field label="Weight (kg)" value={form.weightKg} onChange={v => setField("weightKg", v)} oneDecimal placeholder="e.g. 42.7" error={errors.weightKg} />
-                </div>
-                <div className="grid md:grid-cols-2 gap-4 mt-3">
-                  <Field label="Blood Pressure" value={form.bloodPressure} onChange={v => setField("bloodPressure", v)} placeholder="e.g. 120/80" error={errors.bloodPressure} />
-                  <Field label="Temperature (°C)" value={form.temperatureC} onChange={v => setField("temperatureC", v)} oneDecimal placeholder="e.g. 37.5" error={errors.temperatureC} />
-                </div>
-                <div className="mt-3">
-                  <label className="block text-sm mb-1">Chief Complaint:</label>
-                  <textarea className={`w-full border rounded px-3 py-2 min-h-[120px] bg-white ${errors.chiefComplaint ? 'border-red-400' : ''}`}
-                    value={form.chiefComplaint} onChange={e => setField("chiefComplaint", e.target.value)} />
-                  {errors.chiefComplaint && (
-                    <div className="text-xs text-red-600 mt-1">{errors.chiefComplaint}</div>
-                  )}
-                </div>
-
-                <label className="flex items-center gap-2 text-sm mt-2">
-                  <input type="checkbox" className="accent-orange-500"
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    className="checkbox-input"
                     checked={form.proceedToQueue}
-                    onChange={e => setField("proceedToQueue", e.target.checked)} />
-                  Proceed to Queuing
+                    onChange={e => setField("proceedToQueue", e.target.checked)}
+                  />
+                  <span className="checkbox-label">Proceed to Queuing</span>
                 </label>
 
                 {errors._form && (
-                  <div className="mt-3 text-sm text-red-700">{errors._form}</div>
+                  <div className="error-text">{errors._form}</div>
                 )}
 
-                <div className="mt-4 flex gap-3">
+                {/* STICKY submit bar */}
+                <div className="actions actions--sticky">
                   <button
                     onClick={() => setMode("patient")}
                     type="button"
-                    className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
+                    className="btn btn--secondary"
                   >
                     Back
                   </button>
                   <button
                     type="submit"
                     disabled={saving || !canSubmit}
-                    className="px-4 py-2 rounded bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60"
+                    className="btn btn--primary btn--full"
                   >
                     {saving ? "Saving..." : "Submit"}
                   </button>
@@ -458,21 +641,21 @@ export default function BhwFamily() {
 
 function PastDetail({ rec, patient, onBack, onViewChart, onViewDocs }) {
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">{dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
-        <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">Back</button>
+    <div className="past past--detail">
+      <div className="past-head">
+        <h3 className="subhead">{dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
+        <button onClick={onBack} className="btn btn--light">Back</button>
       </div>
 
-      <div className="mt-3 text-sm space-y-1">
+      <div className="past-meta">
         <div><strong>Patient Name:</strong> {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}</div>
         <div><strong>Doctor in Charge:</strong> {rec.doctor_full_name || "—"}</div>
         <div><strong>Date:</strong> {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</div>
       </div>
 
-      <div className="mt-6 space-y-3">
-        <button onClick={onViewChart} className="w-full rounded py-2 bg-orange-300 text-white hover:bg-orange-400">View Chart</button>
-        <button onClick={onViewDocs} className="w-full rounded py-2 bg-orange-300 text-white hover:bg-orange-400">View Documents</button>
+      <div className="past-actions">
+        <button onClick={onViewChart} className="btn btn--accent-block">View Chart</button>
+        <button onClick={onViewDocs} className="btn btn--accent-block">View Documents</button>
       </div>
     </div>
   );
@@ -480,25 +663,25 @@ function PastDetail({ rec, patient, onBack, onViewChart, onViewDocs }) {
 
 function PastChartViewLite({ rec, patient, onBack }) {
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Chart – {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
-        <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">Back</button>
+    <div className="past past--chart">
+      <div className="past-head">
+        <h3 className="subhead">Chart – {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
+        <button onClick={onBack} className="btn btn--light">Back</button>
       </div>
 
-      <div className="mt-4 grid md:grid-cols-2 gap-4 text-sm">
-        <div className="border rounded p-3 bg-white">
-          <div className="font-semibold mb-2">Nurse Vitals</div>
+      <div className="grid grid--two">
+        <div className="card">
+          <div className="card__title">Nurse Vitals</div>
           <div>Height: {rec.height_cm ?? "—"} cm</div>
           <div>Weight: {rec.weight_kg ?? "—"} kg</div>
           <div>BP: {rec.blood_pressure ?? "—"}</div>
           <div>Temperature: {rec.temperature_c ?? "—"} °C</div>
           <div>Chief Complaint: {rec.chief_complaint || "—"}</div>
         </div>
-        <div className="border rounded p-3 bg-white">
-          <div className="font-semibold mb-2">Doctor’s Notes</div>
-          <div className="whitespace-pre-wrap">{rec.doctor_notes || "—"}</div>
-          <div className="mt-2 text-xs text-gray-600">Doctor: {rec.doctor_full_name || "—"}</div>
+        <div className="card">
+          <div className="card__title">Doctor’s Notes</div>
+          <div className="prewrap">{rec.doctor_notes || "—"}</div>
+          <div className="muted small">Doctor: {rec.doctor_full_name || "—"}</div>
         </div>
       </div>
     </div>
@@ -533,25 +716,25 @@ function PastDocumentsViewLite({ rec, onBack }) {
   }, [rec.id]);
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Document Request</h3>
-        <button onClick={onBack} className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm">Back</button>
+    <div className="past past--docs">
+      <div className="past-head">
+        <h3 className="subhead">Document Request</h3>
+        <button onClick={onBack} className="btn btn--light">Back</button>
       </div>
 
-      <div className="mt-3 border rounded p-4 bg-orange-50">
-        {loading && <div className="text-sm text-gray-600">Loading…</div>}
-        {err && <div className="text-sm text-red-600">{err}</div>}
+      <div className="docs-panel">
+        {loading && <div className="status status--loading">Loading…</div>}
+        {err && <div className="error-text">{err}</div>}
         {!loading && !err && (
-          <div className="space-y-3">
-            {docs.length === 0 && <div className="text-sm text-gray-600">No documents saved for this record.</div>}
+          <div className="docs-list">
+            {docs.length === 0 && <div className="muted">No documents saved for this record.</div>}
             {docs.map(d => (
-              <div key={d.id} className="border rounded px-3 py-2 bg-white flex items-center justify-between">
-                <div className="font-semibold uppercase">
-                  {d.type} <span className="normal-case text-gray-600 text-xs">• {new Date(d.created_at).toLocaleString()}</span>
+              <div key={d.id} className="doc-row">
+                <div className="doc-row__title">
+                  {d.type} <span className="doc-row__meta">• {new Date(d.created_at).toLocaleString()}</span>
                 </div>
-                <div className="text-xs text-gray-600">
-                  {d.url ? <a className="underline" href={d.url} target="_blank" rel="noreferrer">open file</a> : "no file URL"}
+                <div className="doc-row__link">
+                  {d.url ? <a className="link" href={d.url} target="_blank" rel="noreferrer">open file</a> : "no file URL"}
                 </div>
               </div>
             ))}
@@ -562,7 +745,9 @@ function PastDocumentsViewLite({ rec, onBack }) {
   );
 }
 
-/* Small input helper (with digits-only support + one-decimal support + error display) */
+/* ---------- Input helpers ---------- */
+
+/* Vitals/BP/Temp input with decimal and slash handling (unchanged) */
 function Field({
   label,
   value,
@@ -570,44 +755,79 @@ function Field({
   type = "text",
   placeholder = "",
   step,
-  digitsOnly = false,   // integers only
-  oneDecimal = false,   // allow at most 1 decimal
+  mode,            // "height" | "weight" | "bp" | "temp" | undefined
   error,
 }) {
   const handleChange = (e) => {
-    let raw = e.target.value;
-    if (digitsOnly) {
-      const next = raw.replace(/\D+/g, "");
-      onChange(next);
+    let raw = e.target.value ?? "";
+
+    if (mode === "bp") {
+      raw = raw.replace(/[^\d/]/g, "");
+      const firstSlash = raw.indexOf("/");
+      if (firstSlash !== -1) {
+        raw = raw.slice(0, firstSlash + 1) + raw.slice(firstSlash + 1).replace(/\//g, "");
+      }
+      const [a = "", b = ""] = raw.split("/");
+      const left = a.replace(/\D/g, "").slice(0, 4);
+      const right = b.replace(/\D/g, "").slice(0, 4);
+      raw = b === undefined ? left : `${left}/${right}`;
+      onChange(raw);
       return;
     }
-    if (oneDecimal) {
-      let txt = raw.replace(/[^0-9.]/g, "");
+
+    const clampDecimal = (txt, maxDigitsTotal, maxDecimals) => {
+      if (txt === ".") return "0.";
+      txt = txt.replace(/[^0-9.]/g, "");
       const firstDot = txt.indexOf(".");
       if (firstDot !== -1) {
         txt = txt.slice(0, firstDot + 1) + txt.slice(firstDot + 1).replace(/\./g, "");
       }
-      if (txt.startsWith(".")) txt = "0" + txt;
-      const parts = txt.split(".");
-      if (parts.length === 2) {
-        txt = parts[0] + "." + parts[1].slice(0, 1);
+      if (firstDot !== -1) {
+        let [intPart, decPartRaw] = txt.split(".");
+        if (intPart === "") intPart = "0";
+        const trailingDotOnly = decPartRaw === "" || decPartRaw == null;
+        let decPart = (decPartRaw ?? "").slice(0, maxDecimals);
+
+        let totalDigits = (intPart + decPart).length;
+        if (totalDigits > maxDigitsTotal) {
+          const overflow = totalDigits - maxDigitsTotal;
+          if (decPart.length >= overflow) {
+            decPart = decPart.slice(0, decPart.length - overflow);
+          } else {
+            const still = overflow - decPart.length;
+            decPart = "";
+            intPart = intPart.slice(0, Math.max(0, intPart.length - still));
+          }
+        }
+        if (trailingDotOnly) return `${intPart}.`;
+        return decPart.length ? `${intPart}.${decPart}` : intPart;
+      } else {
+        const digits = txt.replace(/\D/g, "");
+        if (digits.length > maxDigitsTotal) return digits.slice(0, maxDigitsTotal);
+        return digits;
       }
-      onChange(txt);
-      return;
-    }
+    };
+
+    if (mode === "height") { onChange(clampDecimal(raw, 5, 1)); return; }
+    if (mode === "weight") { onChange(clampDecimal(raw, 4, 2)); return; }
+    if (mode === "temp")   { onChange(clampDecimal(raw, 4, 2)); return; }
+
     onChange(raw);
   };
 
+  const inputMode =
+    mode === "bp" ? "numeric" :
+    (mode ? "decimal" : undefined);
+
   return (
-    <div>
-      <label className="block text-sm mb-1">{label}:</label>
+    <div className="field">
+      <label className="label">{label}:</label>
       <input
-        className={`w-full border rounded px-3 py-2 bg-white ${error ? 'border-red-400' : ''}`}
+        className={`input ${error ? 'has-error' : ''}`}
         value={value}
         onChange={handleChange}
-        type={(digitsOnly || oneDecimal) ? "text" : type}
-        inputMode={oneDecimal ? "decimal" : (digitsOnly ? "numeric" : undefined)}
-        pattern={oneDecimal ? "^\\d+(\\.\\d)?$" : (digitsOnly ? "[0-9]*" : undefined)}
+        type={mode ? "text" : type}
+        inputMode={inputMode}
         step={step}
         placeholder={placeholder}
         autoComplete="off"
@@ -615,7 +835,57 @@ function Field({
         autoCapitalize="none"
         spellCheck={false}
       />
-      {error && <div className="text-xs text-red-600 mt-1">{error}</div>}
+      {error && <div className="error-text">{error}</div>}
+    </div>
+  );
+}
+
+/* Simple text field (letters/spaces are validated in validate()) */
+function TextField({ label, value, onChange, placeholder, error }) {
+  return (
+    <div className="field">
+      <label className="label">{label}:</label>
+      <input
+        className={`input ${error ? 'has-error' : ''}`}
+        value={value}
+        onChange={(e)=>onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="words"
+        spellCheck={false}
+      />
+      {error && <div className="error-text">{error}</div>}
+    </div>
+  );
+}
+
+/* Digits-only field with exact length (for the 11-digit emergency number) */
+function DigitsField({ label, value, onChange, exactLen = 11, placeholder, error }) {
+  const handle = (e) => {
+    const digits = (e.target.value || "").replace(/\D/g, "").slice(0, exactLen);
+    onChange(digits);
+  };
+  const showLenError = value && String(value).length > 0 && String(value).length !== exactLen;
+  return (
+    <div className="field">
+      <label className="label">{label}:</label>
+      <input
+        className={`input ${(error || showLenError) ? 'has-error' : ''}`}
+        value={value}
+        onChange={handle}
+        inputMode="numeric"
+        placeholder={placeholder}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="none"
+        spellCheck={false}
+        maxLength={exactLen}
+        title={`Must be exactly ${exactLen} digits`}
+      />
+      {(error || showLenError) && (
+        <div className="error-text">{error || `Must be exactly ${exactLen} digits.`}</div>
+      )}
     </div>
   );
 }

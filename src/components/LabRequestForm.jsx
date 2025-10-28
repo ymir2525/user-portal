@@ -1,7 +1,8 @@
 // src/components/LabRequestForm.jsx
 import React, { useEffect, useState } from "react";
 import { fullName } from "../lib/utils";
-import SignatureDialog from "./signaturePad/SignatureDialog"; // ← NEW
+import SignatureDialog from "./signaturePad/SignatureDialog";
+import "./LabRequestForm.css"; // <-- external CSS (no Tailwind)
 
 const LEFT_TESTS = [
   "CBC",
@@ -75,10 +76,10 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
     licNo: "",
     ptrNo: "",
     s2No: "",
-    doctorSignaturePng: "", // ← NEW: drawn signature PNG
+    doctorSignaturePng: "", // drawn signature PNG
   });
 
-  // modal open/close (NEW)
+  // modal open/close
   const [sigOpen, setSigOpen] = useState(false);
 
   useEffect(() => {
@@ -134,30 +135,20 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
   };
 
   return (
-    <div className="bg-white border rounded p-4 print:p-0">
+    <div className="lr-wrap">
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-3 print:hidden">
-        <div className="text-lg font-semibold">Laboratory Request Form</div>
-        <div className="space-x-2">
-          <button
-            onClick={onBack}
-            className="px-3 py-1 rounded bg-orange-200 hover:bg-orange-300 text-sm"
-          >
-            Back
-          </button>
-          <button
-            onClick={onSave}
-            className="px-3 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-sm"
-          >
-            Save as PDF
-          </button>
+      <div className="lr-toolbar">
+        <div className="lr-toolbar__title">Laboratory Request Form</div>
+        <div className="lr-toolbar__actions">
+          <button onClick={onBack} className="btn btn--light">Back</button>
+          <button onClick={onSave} className="btn btn--primary">Save as PDF</button>
         </div>
       </div>
 
       {/* Screen form */}
       <div className="screen-only">
-        <div className="max-w-4xl mx-auto border p-6">
-          <div className="grid md:grid-cols-2 gap-3">
+        <div className="lr-form">
+          <div className="grid-two">
             {/* READ-ONLY fetched fields */}
             <Field label="Patient’s Name">
               <ReadOnlyInput value={form.patientName} />
@@ -173,27 +164,17 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
             </Field>
           </div>
 
-          <h3 className="text-center font-semibold text-orange-600 my-4">
-            LABORATORY REQUEST FORM
-          </h3>
+          <h3 className="lr-title">LABORATORY REQUEST FORM</h3>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            <TestColumn
-              tests={LEFT_TESTS}
-              isChecked={isChecked}
-              toggle={toggleTest}
-            />
-            <TestColumn
-              tests={RIGHT_TESTS}
-              isChecked={isChecked}
-              toggle={toggleTest}
-            />
+          <div className="grid-two gap-wide">
+            <TestColumn tests={LEFT_TESTS} isChecked={isChecked} toggle={toggleTest} />
+            <TestColumn tests={RIGHT_TESTS} isChecked={isChecked} toggle={toggleTest} />
           </div>
 
-          <div className="mt-4 grid md:grid-cols-2 gap-3">
+          <div className="grid-two">
             <Field label="Others">
               <input
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 value={form.others}
                 onChange={(e) => set("others", e.target.value)}
               />
@@ -201,41 +182,38 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
             <div />
           </div>
 
-          <div className="mt-6 grid md:grid-cols-2 gap-3">
+          <div className="grid-two">
             <Field label="Physician (MD)">
               <input
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 value={form.doctorName}
                 onChange={(e) => set("doctorName", e.target.value)}
               />
             </Field>
             <div />
 
-            {/* --- Signature capture UI (NEW, below Physician field) --- */}
-            <div className="md:col-span-2">
-              <div className="text-xs text-slate-600 mb-1">
+            {/* --- Signature capture UI (below Physician field) --- */}
+            <div className="sig-capture">
+              <div className="sig-caption-screen">
                 Capture physician’s handwritten signature (prints above MD label)
               </div>
-              <div className="flex items-start gap-4">
-                <button
-                  type="button"
-                  onClick={() => setSigOpen(true)}
-                  className="rounded-md border px-3 py-1 hover:bg-slate-50"
-                >
+
+              <div className="sig-actions">
+                <button type="button" onClick={() => setSigOpen(true)} className="btn btn--outline">
                   {form.doctorSignaturePng ? "Retake Signature" : "Capture Signature"}
                 </button>
 
                 {form.doctorSignaturePng && (
-                  <div className="flex items-center gap-3">
+                  <div className="sig-preview">
                     <img
                       src={form.doctorSignaturePng}
                       alt="Physician Signature"
-                      className="max-h-20 border rounded bg-white"
+                      className="sig-img"
                     />
                     <button
                       type="button"
                       onClick={() => set("doctorSignaturePng", "")}
-                      className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                      className="btn btn--outline"
                     >
                       Clear
                     </button>
@@ -246,21 +224,21 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
 
             <Field label="Lic. No.">
               <input
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 value={form.licNo}
                 onChange={(e) => set("licNo", e.target.value)}
               />
             </Field>
             <Field label="PTR No.">
               <input
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 value={form.ptrNo}
                 onChange={(e) => set("ptrNo", e.target.value)}
               />
             </Field>
             <Field label="S2 No.">
               <input
-                className="w-full border rounded px-3 py-2"
+                className="input"
                 value={form.s2No}
                 onChange={(e) => set("s2No", e.target.value)}
               />
@@ -286,7 +264,7 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
               <span>Date:</span> <span className="line">{v(form.date)}</span>
             </div>
 
-            <div className="lr-title">LABORATORY REQUEST FORM</div>
+            <div className="lr-title-print">LABORATORY REQUEST FORM</div>
 
             <div className="lr-grid">
               <div>
@@ -306,13 +284,12 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
 
             <div className="lr-sign">
               <div className="sig-right">
-                {/* NEW: show signature image if available */}
                 {v(form.doctorSignaturePng) ? (
-                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
+                  <div className="sig-print-imgwrap">
                     <img
                       src={form.doctorSignaturePng}
                       alt="Physician Signature"
-                      style={{ maxHeight: "80px", maxWidth: "70%", objectFit: "contain" }}
+                      className="sig-print-img"
                     />
                   </div>
                 ) : null}
@@ -329,41 +306,6 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
         </div>
       </div>
 
-      <style>{`
-        .print-only { display: none; }
-        .screen-only { display: block; }
-
-        .lr-sheet { font-family: "Times New Roman", Georgia, serif; font-size: 12.5px; padding: 16px; }
-        .lr-box { border: 3px solid #f59e0b; padding: 14px 16px; }
-        .lr-row { margin: 6px 0; }
-        .lr-title { text-align: center; font-weight: 700; color: #e76f00; margin: 10px 0 14px; }
-        .lr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 50px; }
-
-        .line { display:inline-block; border-bottom:1px solid #000; min-width:140px; margin-left:6px; }
-        .line.wide { min-width: 280px; }
-        .line.small { min-width: 120px; }
-
-        .lr-check { display:flex; align-items:flex-start; gap:8px; margin: 4px 0; }
-        .box { width: 11px; height: 11px; border: 1px solid #000; display:inline-block; position: relative; top: 2px; }
-        .box.checked::after { content: "✕"; position:absolute; left: 0; right: 0; top:-4px; text-align:center; font-size:12px; }
-
-        .lr-sign { display:flex; justify-content: space-between; align-items:flex-end; margin-top: 24px; }
-        .sig-right { text-align: right; }
-        .sig-name { display:inline-block; min-width:220px; border-top:1px solid #000; text-align:center; padding-top:3px; font-weight:700; }
-        .sig-caption { text-align:center; margin-top:2px; }
-        .sig-nums > div { margin: 4px 0; }
-
-        @page { size: A4; margin: 12mm; }
-        @media print {
-          body * { visibility: hidden !important; }
-          header, aside { display: none !important; }
-          #print-labreq, #print-labreq * { visibility: visible !important; }
-          #print-labreq { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-          .screen-only { display: none !important; }
-          .print-only { display: block !important; }
-        }
-      `}</style>
-
       {/* Signature modal lives outside the screen/print sections */}
       <SignatureDialog
         open={sigOpen}
@@ -371,7 +313,7 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
         initialValue={form.doctorSignaturePng}
         onDone={(png) => set("doctorSignaturePng", png)}
         title="Physician Signature"
-        heightClass="h-56"
+        heightClass="h-56" /* (kept prop name; dialog handles it) */
       />
     </div>
   );
@@ -379,8 +321,8 @@ export default function LabRequestForm({ active, onBack, onSavePdf }) {
 
 function Field({ label, children }) {
   return (
-    <label className="block">
-      <div className="text-xs font-semibold mb-1">{label}</div>
+    <label className="field">
+      <div className="field__label">{label}</div>
       {children}
     </label>
   );
@@ -388,11 +330,7 @@ function Field({ label, children }) {
 
 function ReadOnlyInput({ value }) {
   return (
-    <div
-      className="w-full border rounded px-3 py-2 bg-gray-50 text-gray-600"
-      tabIndex={-1}
-      aria-readonly="true"
-    >
+    <div className="readonly" tabIndex={-1} aria-readonly="true">
       {value || ""}
     </div>
   );
@@ -402,8 +340,8 @@ function TestColumn({ tests, isChecked, toggle }) {
   return (
     <div>
       {tests.map((t) => (
-        <label key={t} className="flex items-center gap-2 mb-1">
-          <input type="checkbox" className="accent-orange-500" checked={isChecked(t)} onChange={() => toggle(t)} />
+        <label key={t} className="checkline">
+          <input type="checkbox" className="checkline__box" checked={isChecked(t)} onChange={() => toggle(t)} />
           <span>{t}</span>
         </label>
       ))}

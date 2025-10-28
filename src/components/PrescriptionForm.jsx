@@ -2,6 +2,7 @@
 import React, { useRef, useState } from "react";
 import { fmtDate, fullName } from "../lib/utils";
 import SignatureDialog from "./signaturePad/SignatureDialog";
+import "./PrescriptionForm.css"; // ← external CSS (no Tailwind)
 
 export default function PrescriptionForm({ active, onBack, onSavePdf }) {
   // --- Date / Doctor / Items (free-text only) ---
@@ -123,43 +124,35 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
   };
 
   return (
-    <div className="max-w-[960px] mx-auto">
+    <div className="rx-wrap">
       {/* ---------- SCREEN ENTRY (hidden on print) ---------- */}
-      <div className="print:hidden">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold">Prescription</h1>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onBack}
-              className="px-3 py-1.5 rounded bg-orange-200 hover:bg-orange-300 text-sm"
-            >
+      <div className="screen-only">
+        <div className="rx-toolbar">
+          <h1 className="rx-toolbar__title">Prescription</h1>
+          <div className="rx-toolbar__actions">
+            <button type="button" onClick={onBack} className="btn btn--light">
               Back
             </button>
-            <button
-              type="button"
-              onClick={submit}
-              className="px-3 py-1.5 rounded bg-emerald-500 hover:bg-emerald-600 text-white text-sm"
-            >
+            <button type="button" onClick={submit} className="btn btn--primary">
               Save as PDF
             </button>
           </div>
         </div>
 
-        <div className="mx-auto bg-white border rounded shadow-sm">
-          <div className="p-6">
-            <div className="text-center leading-tight mb-4">
-              <div className="font-semibold">Caybiga Health Center</div>
-              <div className="text-xs text-gray-600 tracking-wide">PRESCRIPTION FORM</div>
+        <div className="rx-card">
+          <div className="rx-card__inner">
+            <div className="rx-heading">
+              <div className="rx-heading__clinic">Caybiga Health Center</div>
+              <div className="rx-heading__form">PRESCRIPTION FORM</div>
             </div>
 
             {/* Using a form for layout only; no onSubmit */}
-            <form id="rx-form" className="space-y-6" autoComplete="off">
+            <form id="rx-form" className="rx-form" autoComplete="off">
               {/* Patient row (all read-only) */}
-              <section className="grid md:grid-cols-3 gap-4">
+              <section className="grid-3">
                 <Field label="Patient Name">
                   <input
-                    className="w-full h-10 border rounded px-3 bg-gray-50 text-gray-600"
+                    className="input input--ro"
                     readOnly
                     value={fullName(active)}
                     tabIndex={-1}
@@ -167,7 +160,7 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
                 </Field>
                 <Field label="Sex">
                   <input
-                    className="w-full h-10 border rounded px-3 bg-gray-50 text-gray-600"
+                    className="input input--ro"
                     readOnly
                     value={sexDisplay(active?.sex) || ""}
                     tabIndex={-1}
@@ -175,27 +168,21 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
                 </Field>
                 <Field label="Age">
                   <input
-                    className="w-full h-10 border rounded px-3 bg-gray-50 text-gray-600"
+                    className="input input--ro"
                     readOnly
-                    value={computeAge() || ""}
-                    tabIndex={-1}
+                    value={computeAge() || ""} tabIndex={-1}
                   />
                 </Field>
               </section>
 
               {/* Meta row (Date is read-only now) */}
-              <section className="grid md:grid-cols-3 gap-4">
+              <section className="grid-3">
                 <Field label="Date">
-                  <input
-                    className="w-full h-10 border rounded px-3 bg-gray-50 text-gray-600"
-                    readOnly
-                    value={date}
-                    tabIndex={-1}
-                  />
+                  <input className="input input--ro" readOnly value={date} tabIndex={-1} />
                 </Field>
                 <Field label="Physician" required>
                   <input
-                    className="w-full h-10 border rounded px-3"
+                    className="input"
                     value={doctorName}
                     onChange={(e) => setDoctorName(e.target.value)}
                     required
@@ -203,7 +190,7 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
                 </Field>
                 <Field label="License No." required>
                   <input
-                    className="w-full h-10 border rounded px-3"
+                    className="input"
                     value={licenseNo}
                     onChange={(e) => setLicenseNo(e.target.value)}
                     required
@@ -212,47 +199,47 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
               </section>
 
               {/* Signature capture */}
-              <section className="text-sm">
-                <div className="flex items-start gap-4">
+              <section className="sig-block">
+                <div className="sig-actions">
                   <button
                     type="button"
                     onClick={() => setSigOpen(true)}
-                    className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                    className="btn btn--outline"
                   >
                     {doctorSignaturePng ? "Retake Signature" : "Capture Signature"}
                   </button>
 
                   {doctorSignaturePng && (
-                    <div className="flex items-center gap-3">
+                    <div className="sig-preview">
                       <img
                         src={doctorSignaturePng}
                         alt="Physician Signature"
-                        className="max-h-20 border rounded bg-white"
+                        className="sig-img"
                       />
                       <button
                         type="button"
                         onClick={() => setDoctorSignaturePng("")}
-                        className="rounded-md border px-3 py-1 hover:bg-slate-50"
+                        className="btn btn--outline"
                       >
                         Clear
                       </button>
                     </div>
                   )}
                 </div>
-                <div className="text-xs text-slate-500 mt-1">
+                <div className="muted small mt-1">
                   Signature will print above the “Signature” line.
                 </div>
               </section>
 
               {/* Medicines section — FREE TEXT ONLY */}
-              <section className="space-y-4">
-                <div className="text-sm font-semibold">Medicines to prescribe</div>
+              <section className="meds">
+                <div className="meds__title">Medicines to prescribe</div>
 
                 {items.map((row, i) => (
-                  <div key={i} className="border rounded p-4 bg-white space-y-3">
+                  <div key={i} className="med-row">
                     <Field label="Medicine name">
                       <input
-                        className="w-full h-10 border rounded px-3"
+                        className="input"
                         placeholder="Type medicine name"
                         value={row.name}
                         onChange={(e) => setItem(i, { name: e.target.value })}
@@ -261,7 +248,7 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
 
                     <Field label="Quantity">
                       <input
-                        className="w-full h-10 border rounded px-3"
+                        className="input"
                         value={row.qty}
                         inputMode="numeric"
                         pattern="[0-9]*"
@@ -273,19 +260,19 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
 
                     <Field label="Directions of use">
                       <input
-                        className="w-full h-10 border rounded px-3"
+                        className="input"
                         placeholder="e.g., 1 tab BID x 7 days"
                         value={row.sig}
                         onChange={(e) => setItem(i, { sig: e.target.value })}
                       />
                     </Field>
 
-                    <div className="pt-1 flex justify-end">
+                    <div className="med-row__end">
                       {items.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeRow(i)}
-                          className="text-xs underline text-red-600"
+                          className="link link--danger"
                         >
                           Remove
                         </button>
@@ -294,7 +281,7 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
                   </div>
                 ))}
 
-                <button type="button" onClick={addRow} className="text-sm underline">
+                <button type="button" onClick={addRow} className="link">
                   + Add another medicine
                 </button>
               </section>
@@ -304,18 +291,9 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
       </div>
 
       {/* ---------- PRINT SHEET (shown only on print/PDF) ---------- */}
-      <div id="rx-print">
+      <div id="rx-print" className="print-only">
         <RxPrintSheet payload={payload} />
       </div>
-
-      {/* Print isolation so only #rx-print renders */}
-      <style>{`
-        @media print {
-          body * { visibility: hidden !important; }
-          #rx-print, #rx-print * { visibility: visible !important; }
-          #rx-print { position: absolute; left: 0; top: 0; width: 100%; }
-        }
-      `}</style>
 
       {/* Reusable Signature Dialog */}
       <SignatureDialog
@@ -333,10 +311,10 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
 /* Small helpers */
 function Field({ label, span = 4, required, children }) {
   return (
-    <div className={`md:col-span-${span}`}>
-      <label className="block text-xs mb-1">
+    <div className="field" data-span={span}>
+      <label className="field__label">
         {label}
-        {required && <span className="text-red-500"> *</span>}
+        {required && <span className="req">*</span>}
       </label>
       {children}
     </div>
@@ -345,11 +323,9 @@ function Field({ label, span = 4, required, children }) {
 
 function LabeledLine({ label, value, className = "" }) {
   return (
-    <div className={`flex items-center gap-2 text-xs ${className}`}>
-      <span className="font-semibold">{label}</span>
-      <div className="flex-1 border-b border-gray-400 h-[18px] leading-[18px] px-2">
-        {value || ""}
-      </div>
+    <div className={`line-row ${className}`}>
+      <span className="line-row__label">{label}</span>
+      <div className="line-row__line">{value || ""}</div>
     </div>
   );
 }
@@ -361,75 +337,81 @@ function RxPrintSheet({ payload }) {
   const rows = Array.from({ length: Math.max(items.length, 5) });
 
   return (
-    <div className="hidden print:block">
-      <div className="mx-auto w-[730px] border rounded p-6 print:m-0">
-        <div className="text-center leading-tight mb-3">
-          <div className="font-semibold">Caybiga Health Center</div>
-          <div className="text-xs">PRESCRIPTION FORM</div>
+    <div className="rx-print-sheet">
+      <div className="rx-print-card">
+        <div className="rx-print-head">
+          <div className="rx-print-clinic">Caybiga Health Center</div>
+          <div className="rx-print-sub">PRESCRIPTION FORM</div>
         </div>
-        <div className="border-t border-orange-400 my-3" />
-        <div className="grid grid-cols-12 gap-3 mb-3">
-          <div className="col-span-7">
+
+        <div className="rx-print-div" />
+
+        <div className="rx-print-grid">
+          <div className="rx-print-col rx-print-col--wide">
             <LabeledLine label="Name:" value={p.patient?.name} />
           </div>
-          <div className="col-span-2">
+          <div className="rx-print-col">
             <LabeledLine label="Age:" value={p.patient?.age} />
           </div>
-          <div className="col-span-3">
+          <div className="rx-print-col">
             <LabeledLine label="Date:" value={p.date} />
           </div>
-          <div className="col-span-7">
+          <div className="rx-print-col rx-print-col--wide">
             <LabeledLine label="Sex:" value={p.patient?.sex} />
           </div>
         </div>
-        <div className="font-bold text-2xl text-orange-600 mb-2">℞</div>
-        <div className="mb-10">
+
+        <div className="rx-symbol">℞</div>
+
+        <div className="rx-print-items">
           {rows.map((_, i) => {
             const row = items[i] || {};
             return (
-              <div key={i} className="grid grid-cols-12 items-start text-xs mb-3">
-                <div className="col-span-10">
-                  <div className="flex items-center">
-                    <div className="w-5 text-right pr-1">{i + 1}.</div>
-                    <div className="flex-1 border-b border-gray-400 min-h-[18px] leading-[18px] px-2">
-                      {row.name || ""}
-                    </div>
+              <div key={i} className="rx-print-itemrow">
+                <div className="rx-print-itemrow__left">
+                  <div className="rx-print-itemrow__top">
+                    <div className="rx-print-index">{i + 1}.</div>
+                    <div className="rx-print-line">{row.name || ""}</div>
                   </div>
-                  <div className="pl-6 mt-1">
-                    <span className="font-semibold">Sig:</span>{" "}
-                    <span className="inline-block align-baseline w-[85%] border-b border-gray-400 min-h-[18px] leading-[18px] px-2">
+                  <div className="rx-print-itemrow__sig">
+                    <span className="rx-print-siglabel">Sig:</span>
+                    <span className="rx-print-line rx-print-line--wide">
                       {row.sig || ""}
                     </span>
                   </div>
                 </div>
-                <div className="col-span-2 text-right pr-2">
-                  <div className="font-semibold">#</div>
-                  <div className="min-h-[18px]">{row.qty || ""}</div>
+                <div className="rx-print-itemrow__qty">
+                  <div className="rx-print-qtylabel">#</div>
+                  <div className="rx-print-qty">{row.qty || ""}</div>
                 </div>
               </div>
             );
           })}
         </div>
-        <div className="grid grid-cols-12 text-xs">
-          <div className="col-span-7" />
-          <div className="col-span-5 text-right">
-            <div className="mb-6">
-              {p.signature_png ? (
-                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4px" }}>
-                  <img
-                    src={p.signature_png}
-                    alt="Physician Signature"
-                    style={{ maxHeight: "80px", maxWidth: "70%", objectFit: "contain" }}
-                  />
-                </div>
-              ) : null}
-              <div className="border-b border-gray-400 h-[18px]" />
-              <div className="mt-1">Signature</div>
+
+        <div className="rx-print-footer">
+          <div />
+          <div className="rx-print-signblock">
+            {p.signature_png ? (
+              <div className="rx-print-signimgwrap">
+                <img
+                  src={p.signature_png}
+                  alt="Physician Signature"
+                  className="rx-print-signimg"
+                />
+              </div>
+            ) : null}
+            <div className="rx-print-signline" />
+            <div className="rx-print-sigcaption">Signature</div>
+
+            <div className="rx-print-doc">
+              <div className="rx-print-docname">
+                Physician: {p.doctor_name || "_____________________________"}
+              </div>
+              <div className="rx-print-doclic">
+                License No.: {p.license_no || "_________________"}
+              </div>
             </div>
-            <div className="font-semibold">
-              Physician: {p.doctor_name || "_____________________________"}
-            </div>
-            <div>License No.: {p.license_no || "_________________"}</div>
           </div>
         </div>
       </div>

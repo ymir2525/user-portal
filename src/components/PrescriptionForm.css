@@ -1,0 +1,182 @@
+/* =========================
+   Base palette & helpers
+========================= */
+:root{
+  --orange-200:#fed7aa;
+  --orange-300:#fdba74;
+  --orange-400:#fb923c;
+  --orange-600:#ea580c;
+
+  --gray-50:#f8fafc;
+  --gray-200:#e5e7eb;
+  --gray-300:#d1d5db;
+  --gray-400:#9ca3af;
+  --gray-500:#6b7280;
+
+  --green-500:#22c55e;
+  --green-600:#16a34a;
+
+  --red-600:#dc2626;
+}
+
+*{ box-sizing: border-box; }
+body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+
+.small{ font-size: 12px; }
+.muted{ color: var(--gray-500); }
+.mt-1{ margin-top: 4px; }
+
+/* Show/Hide areas */
+.screen-only{ display:block; }
+.print-only{ display:none; }
+
+/* Hide everything except rx-print when printing */
+@media print{
+  body *{ visibility: hidden !important; }
+  #rx-print, #rx-print *{ visibility: visible !important; }
+  #rx-print{ position: absolute; inset: 0; width: 100%; }
+  .screen-only{ display:none !important; }
+  .print-only{ display:block !important; }
+}
+@page{ size: A4; margin: 12mm; }
+
+/* =========================
+   Wrapper & toolbar
+========================= */
+.rx-wrap{
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 8px;
+}
+
+.rx-toolbar{
+  display:flex; align-items:center; justify-content:space-between;
+  margin: 16px 0;
+}
+.rx-toolbar__title{ font-size: 20px; font-weight: 600; }
+.rx-toolbar__actions{ display:flex; gap: 8px; }
+
+/* Buttons */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid transparent; border-radius:6px; padding:8px 12px; cursor:pointer; font:inherit;
+}
+.btn--light{ background: var(--orange-200); border-color: var(--orange-300); color:#7c2d12; }
+.btn--light:hover{ background: var(--orange-300); }
+.btn--primary{ background: var(--green-500); color:#fff; border-color: var(--green-600); }
+.btn--primary:hover{ background: var(--green-600); }
+.btn--outline{ background:#fff; border-color: var(--gray-300); }
+.btn--outline:hover{ background:#f9fafb; }
+
+/* =========================
+   Card / Heading
+========================= */
+.rx-card{
+  background:#fff; border:1px solid var(--gray-200); border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+.rx-card__inner{ padding: 24px; }
+
+.rx-heading{ text-align:center; line-height:1.2; margin-bottom: 16px; }
+.rx-heading__clinic{ font-weight:600; }
+.rx-heading__form{ font-size:12px; letter-spacing:.04em; color: var(--gray-500); }
+
+/* =========================
+   Form layout
+========================= */
+.rx-form{ display:block; }
+.grid-3{ display:grid; grid-template-columns:1fr; gap: 12px; margin-bottom: 16px; }
+@media (min-width: 768px){
+  .grid-3{ grid-template-columns: repeat(3, 1fr); }
+}
+
+.field{ display:block; }
+.field__label{ font-size:12px; margin-bottom:6px; display:block; }
+.req{ color: var(--red-600); margin-left: 4px; }
+
+.input{
+  width:100%; height:40px; border:1px solid var(--gray-300);
+  border-radius:6px; padding:0 12px; background:#fff;
+}
+.input--ro{
+  background: var(--gray-50); color: var(--gray-500);
+}
+
+/* =========================
+   Signature block
+========================= */
+.sig-block{ font-size: 14px; }
+.sig-actions{ display:flex; gap:12px; align-items:flex-start; }
+.sig-preview{ display:flex; align-items:center; gap:10px; }
+.sig-img{ max-height:80px; border:1px solid var(--gray-300); border-radius:4px; background:#fff; }
+
+/* =========================
+   Medicines section
+========================= */
+.meds{ margin-top: 10px; }
+.meds__title{ font-size:14px; font-weight:600; margin-bottom:8px; }
+.med-row{
+  border:1px solid var(--gray-200); border-radius:8px; background:#fff;
+  padding: 16px; margin-bottom: 12px;
+}
+.med-row__end{
+  display:flex; justify-content:flex-end; padding-top: 4px;
+}
+.link{
+  background:none; border:none; padding:0; color:#0b57d0; cursor:pointer;
+  text-decoration: underline; font:inherit;
+}
+.link--danger{ color: var(--red-600); }
+
+/* =========================
+   Print sheet styles
+========================= */
+.rx-print-sheet{ font-family: Arial, sans-serif; }
+.rx-print-card{
+  width: 730px; margin: 0 auto; border:1px solid var(--gray-300);
+  border-radius:8px; padding: 24px;
+}
+.rx-print-head{ text-align:center; line-height:1.1; margin-bottom: 10px; }
+.rx-print-clinic{ font-weight:600; }
+.rx-print-sub{ font-size:12px; }
+.rx-print-div{ border-top:2px solid var(--orange-400); margin: 12px 0; }
+
+.rx-print-grid{
+  display:grid; grid-template-columns: repeat(12, 1fr); gap: 12px; margin-bottom:12px;
+}
+.rx-print-col{ grid-column: span 3; }
+.rx-print-col--wide{ grid-column: span 7; }
+
+.line-row{ display:flex; align-items:center; gap:8px; font-size:12px; }
+.line-row__label{ font-weight:600; }
+.line-row__line{
+  flex:1; border-bottom:1px solid var(--gray-400); min-height:18px; line-height:18px; padding:0 8px;
+}
+
+.rx-symbol{ font-weight:700; font-size: 28px; color:#ea7a27; margin: 10px 0; }
+
+.rx-print-items{ margin-bottom: 28px; }
+.rx-print-itemrow{
+  display:grid; grid-template-columns: repeat(12, 1fr); align-items:flex-start;
+  font-size:12px; margin-bottom: 10px;
+}
+.rx-print-itemrow__left{ grid-column: span 10; }
+.rx-print-itemrow__qty{ grid-column: span 2; text-align:right; padding-right: 8px; }
+.rx-print-itemrow__top{ display:flex; align-items:center; }
+.rx-print-index{ width: 20px; text-align:right; padding-right: 4px; }
+.rx-print-line{
+  flex:1; border-bottom:1px solid var(--gray-400); min-height:18px; line-height:18px; padding:0 8px; display:inline-block;
+}
+.rx-print-line--wide{ width:85%; display:inline-block; }
+.rx-print-itemrow__sig{ padding-left: 24px; margin-top: 4px; }
+.rx-print-siglabel{ font-weight:600; margin-right:6px; }
+
+.rx-print-footer{
+  display:grid; grid-template-columns: repeat(12, 1fr); font-size:12px;
+}
+.rx-print-signblock{ grid-column: span 5; text-align:right; }
+.rx-print-signimgwrap{ display:flex; justify-content:flex-end; margin-bottom:4px; }
+.rx-print-signimg{ max-height:80px; max-width:70%; object-fit:contain; }
+.rx-print-signline{ border-bottom:1px solid var(--gray-400); height:18px; }
+.rx-print-sigcaption{ margin-top: 6px; }
+.rx-print-doc{ margin-top: 8px; }
+.rx-print-docname{ font-weight:600; }

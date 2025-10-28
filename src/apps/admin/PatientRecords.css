@@ -1,0 +1,153 @@
+:root{
+  --text:#111827;
+  --muted:#6b7280;
+  --orange:#e9772e;
+  --border:#d1d5db;       /* gray-300 */
+  --border-strong:#9ca3af;/* gray-400 */
+  --bg:#ffffff;
+  --bg-soft:#f9fafb;      /* gray-50 */
+  --shadow: 0 1px 3px rgba(0,0,0,.06);
+  --overlay: rgba(0,0,0,.4);
+}
+
+*{ box-sizing: border-box; }
+body{ color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+
+/* Layout */
+.pr-section{ max-width: 64rem; }
+.pr-title{
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* Search */
+.pr-search{ margin-bottom: 12px; }
+.pr-search__wrap{ position: relative; }
+.pr-input{
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  transition: box-shadow .15s ease, border-color .15s ease;
+  padding-right: 36px;
+}
+.pr-input:focus{
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(233,119,46,.2);
+}
+
+.pr-alert{
+  margin-top: 8px;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid;
+}
+.pr-alert--error{
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+/* Card wrapper */
+.pr-card{
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: var(--shadow);
+}
+
+/* Table */
+.pr-table{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.pr-table thead th{
+  text-align: left;
+  background: var(--bg-soft);
+  color: #374151;
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  font-weight: 600;
+}
+.pr-table tbody td{
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  vertical-align: top;
+}
+.pr-empty{
+  text-align: center;
+  color: var(--muted);
+  padding: 24px 0;
+  border: 1px solid var(--border);
+}
+
+/* Row interactions */
+.row--clickable{ cursor: pointer; transition: background-color .12s ease; }
+.row--clickable:hover{ background: #f3f4f6; } /* gray-100 */
+
+/* Fixed widths (copied from Tailwind values) */
+.w-180{ width: 180px; }
+.w-220{ width: 220px; }
+.w-120{ width: 120px; }
+
+/* Truncate cell (ID) */
+.truncate{
+  max-width: 0; /* let table layout control width */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Modal */
+.modal{
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--overlay);
+  z-index: 50;
+  padding: 16px;
+}
+.modal__card{
+  width: 100%;
+  max-width: 48rem; /* ~ 768px (Tailwind max-w-2xl) */
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.15);
+  padding: 20px;
+}
+.modal__head{
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.modal__title{
+  margin: 0; font-size: 18px; font-weight: 600;
+}
+.modal__close{
+  padding: 8px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.modal__close:hover{ background: #f3f4f6; }
+
+.modal__actions{
+  margin-top: 12px; text-align: right;
+}
+
+/* Buttons */
+.btn{
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  transition: background .12s ease, opacity .12s ease;
+}
+.btn--light:hover{ background: #f3f4f6; }
