@@ -1,12 +1,22 @@
+// src/App.jsx
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./Login";
 import RequireAuth from "./routes/RequireAuth";
 import BhwDashboard from "./apps/BhwDashboard";
 import BhwFamily from "./apps/BhwFamily";
-import DoctorDashboard from "./apps/DoctorDashboard";
 import AdminApp from "./apps/admin/AdminApp";
-import NurseDashboard from "./apps/nurse/NurseDashboard"; // NEW
+import NurseDashboard from "./apps/nurse/NurseDashboard";
+
+// Doctor (new layout + pages)
+import DoctorDashboard from "./apps/doctor/DoctorDashboard";
+import DoctorDashboardHome from "./apps/doctor/DoctorDashboardHome";
+import DoctorQueueList from "./apps/doctor/DoctorQueueList";
+import DoctorQueueChart from "./apps/doctor/DoctorQueueChart";
+import PatientsPlaceholder from "./apps/doctor/PatientsPlaceholder";
+import InventoryPlaceholder from "./apps/doctor/InventoryPlaceholder";
+import BhwQueueList from "./apps/bhw/BhwQueueList";
+import BhwQueueChart from "./apps/bhw/BhwQueueChart";
 
 export default function App() {
   return (
@@ -18,7 +28,7 @@ export default function App() {
         {/* Public */}
         <Route path="/login" element={<Login />} />
 
-        {/* Protected: BHW (enum value is exactly 'BHW') */}
+        {/* Protected: BHW */}
         <Route
           path="/bhw"
           element={
@@ -35,18 +45,41 @@ export default function App() {
             </RequireAuth>
           }
         />
+<Route
+  path="/bhw/queue"
+  element={
+    <RequireAuth role="BHW">
+      <BhwQueueList />
+    </RequireAuth>
+  }
+/>
+<Route
+  path="/bhw/queue/:recordId"
+  element={
+    <RequireAuth role="BHW">
+      <BhwQueueChart />
+    </RequireAuth>
+  }
+/>
 
-        {/* Protected: Doctor (enum value is 'Doctor', not 'DOCTOR') */}
+        {/* Protected: Doctor (enum value is 'Doctor') */}
         <Route
-          path="/doctor"
+          path="/doctor/*"
           element={
             <RequireAuth role="Doctor">
               <DoctorDashboard />
             </RequireAuth>
           }
-        />
+        >
+          {/* Renders inside <Outlet/> of DoctorDashboard */}
+          <Route index element={<DoctorDashboardHome />} />
+          <Route path="queue" element={<DoctorQueueList />} />
+          <Route path="queue/:recordId" element={<DoctorQueueChart />} />
+          <Route path="patients" element={<PatientsPlaceholder />} />
+          <Route path="inventory" element={<InventoryPlaceholder />} />
+        </Route>
 
-        {/* Protected: Nurse (enum value is 'Nurse') */}
+        {/* Protected: Nurse */}
         <Route
           path="/nurse"
           element={
@@ -56,7 +89,7 @@ export default function App() {
           }
         />
 
-        {/* Protected: Admin (enum value is 'Admin', not 'ADMIN') */}
+        {/* Protected: Admin */}
         <Route
           path="/admin/*"
           element={

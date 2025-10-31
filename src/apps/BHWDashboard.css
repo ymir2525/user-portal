@@ -12,7 +12,8 @@
   grid-template-rows: var(--header-h) 1fr;
   grid-template-columns: var(--sidebar-w) 1fr;
   min-height: 100vh;
-  overflow: hidden;
+  /* prevent horizontal scroll but allow inner panes to scroll */
+  overflow-x: hidden;  /* changed from overflow: hidden */
 }
 
 /* Header stays on top; use sticky so no manual padding needed */
@@ -21,7 +22,7 @@
   position: sticky; /* or fixed if you prefer */
   top: 0;
   height: var(--header-h);
-  z-index: 20;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -40,15 +41,17 @@
   padding: 12px 10px;
   background: #0d3554; /* use your theme color or remove */
   color: #fff;
+  min-height: 0; /* allow grid child to shrink for proper scrolling */
 }
 
 /* Main content sits right of the sidebar */
 .app--bhw .main{
   grid-row: 2;
   grid-column: 2;
-  overflow: auto;
   padding: 16px;
   background: #f7f9fb; /* optional */
+  min-height: 0;        /* allow grid child to shrink inside the grid */
+  overflow: auto;       /* independent scroll */
 }
 
 /* Optional: make the sidebar nav look decent */
@@ -86,7 +89,13 @@
 
 .row { display: grid; gap: 10px; margin-bottom: 10px; }
 .row--two { grid-template-columns: 1fr 1fr; }
-@media (max-width: 920px){ .app.app--bhw{ grid-template-columns: 1fr; } .sidebar{ grid-column:1; grid-row:2; width:auto; } .main{ grid-column:1; } .row--two{ grid-template-columns:1fr; } }
+
+@media (max-width: 920px){
+  .app.app--bhw{ grid-template-columns: 1fr; }
+  .sidebar{ grid-column:1; grid-row:2; width:auto; }
+  .main{ grid-column:1; }
+  .row--two{ grid-template-columns:1fr; }
+}
 
 .stack { display: grid; gap: 8px; }
 .field { display: flex; flex-direction: column; gap: 4px; }
@@ -124,3 +133,15 @@
 .input--search { max-width: 320px; }
 .family-list { display:grid; gap:8px; margin-top:12px; }
 .family-list__item { padding:10px; border:1px solid #ddd; border-radius:6px; text-decoration:none; color:#222; }
+
+/* --- Added small quality-of-life tweaks --- */
+
+/* Keep header above all content (already sticky), add subtle elevation */
+.app--bhw .app-header { box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+
+/* Center the patient registration form on wide screens */
+.form--patient-registration { max-width: 1000px; margin: 0 auto; }
+
+/* Prevent scroll chaining/bounce inside panels (optional) */
+.app--bhw .sidebar,
+.app--bhw .main { overscroll-behavior: contain; }
