@@ -34,7 +34,8 @@ export default function DoctorQueueChart() {
 
   const [banner, setBanner] = useState(null);
   const [rec, setRec] = useState(null);
-  const [tab, setTab] = useState("day"); // 'day' | 'past'
+
+  // removed tabs; keep only docView switching
   const [docView, setDocView] = useState("none"); // 'none'|'referral'|'prescription'|'lab'|'medcert'
   const [saving, setSaving] = useState(false);
 
@@ -43,20 +44,22 @@ export default function DoctorQueueChart() {
   const [docManagement, setDocManagement] = useState("");
 
   // INVENTORY-ONLY sources (non-expired)
-  const [classifications, setClassifications] = useState([]);           // unique classification
-  const [namesByClass, setNamesByClass] = useState(new Map());          // class -> Set(medicine_name)
+  const [classifications, setClassifications] = useState([]);
+  const [namesByClass, setNamesByClass] = useState(new Map());
 
-  // Distributed (multiple rows)
-  const [distRows, setDistRows] = useState([{ classification: "", name: "", qty: "" }]);
+  // Distributed (multiple rows) – extended with dosage, medicine_type, sig
+  const [distRows, setDistRows] = useState([
+    { classification: "", name: "", qty: "", dosage: "", medicine_type: "", sig: "" },
+  ]);
 
   // Prescribed (multiple rows; manual name allowed)
   const [rxRows, setRxRows] = useState([
     { classification: "", name: "", qty: "", nameMode: "dropdown" },
   ]);
 
-  // Preview lists
-  const [distributedList, setDistributedList] = useState([]); // {classification, name, qty}
-  const [prescribedList, setPrescribedList] = useState([]);   // {classification, name, qty}
+  // Lists saved for document + inventory logic
+  const [distributedList, setDistributedList] = useState([]);
+  const [prescribedList, setPrescribedList] = useState([]);
 
   // past
   const [past, setPast] = useState([]);
@@ -127,7 +130,7 @@ export default function DoctorQueueChart() {
       if (error) throw error;
 
       const classSet = new Set();
-      const map = new Map(); // class -> Set(names)
+      const map = new Map();
       (inv || []).forEach((row) => {
         const cls = row.classification || "";
         const name = row.medicine_name || "";
@@ -157,7 +160,7 @@ export default function DoctorQueueChart() {
     [rec]
   );
 
-  /* ---------- past records ---------- */
+  /* ---------- past records (now always loaded, shown below docs) ---------- */
   const loadPastRecords = useCallback(async () => {
     if (!rec) return;
     try {
@@ -180,22 +183,27 @@ export default function DoctorQueueChart() {
     }
   }, [rec]);
   useEffect(() => {
-    if (tab === "past" && rec?.patient_id) void loadPastRecords();
-  }, [tab, rec?.patient_id, loadPastRecords]);
+    if (rec?.patient_id) void loadPastRecords();
+  }, [rec?.patient_id, loadPastRecords]);
 
   /* ---------- helpers ---------- */
   const namesForClass = (cls) => Array.from(namesByClass.get(cls) || []).sort((a, b) => a.localeCompare(b));
 
-  // Distributed row helpers
-  const addDistRow = () => setDistRows((rows) => [...rows, { classification: "", name: "", qty: "" }]);
+ 
+
   const updateDistRow = (i, patch) =>
     setDistRows((rows) =>
       rows.map((r, idx) =>
         idx === i ? { ...r, ...patch, ...(patch.classification ? { name: "" } : null) } : r
       )
     );
+
   const removeDistRow = (i) =>
-    setDistRows((rows) => (rows.length === 1 ? [{ classification: "", name: "", qty: "" }] : rows.filter((_, idx) => idx !== i)));
+    setDistRows((rows) =>
+      rows.length === 1
+        ? [{ classification: "", name: "", qty: "", dosage: "", medicine_type: "", sig: "" }]
+        : rows.filter((_, idx) => idx !== i)
+    );
 
   // Prescribed row helpers
   const addRxRow = () =>
@@ -213,18 +221,57 @@ export default function DoctorQueueChart() {
       rows.length === 1 ? [{ classification: "", name: "", qty: "", nameMode: "dropdown" }] : rows.filter((_, idx) => idx !== i)
     );
 
-  // Add to preview
+  // Add to preview/lists – Distributed: also append to Management text
   const addAllDistributedToList = () => {
     const valid = distRows.filter(
-      (r) => r.classification && r.name && Number(r.qty) > 0 && Number.isFinite(Number(r.qty))
+      (r) =>
+        r.classification &&
+        r.name &&
+        Number(r.qty) > 0 &&
+        Number.isFinite(Number(r.qty))
     );
     if (!valid.length) {
       alert("Complete at least one distributed medicine row (classification, name, positive quantity).");
       return;
     }
-    setDistributedList((prev) => [...prev, ...valid.map((r) => ({ ...r, qty: Number(r.qty) }))]);
-    setDistRows([{ classification: "", name: "", qty: "" }]);
+
+    const mgmtBlocks = valid.map((r) => {
+      const name = r.name || "";
+      const qty = Number(r.qty) || 0;
+      const dosage = (r.dosage || "").trim();
+      const mtype = (r.medicine_type || "").trim();
+      const sig = (r.sig || "").trim();
+
+      const headline =
+        [name, qty ? String(qty) : "", dosage, mtype ? `/${mtype}` : ""]
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\s+\/\s*/g, " / ");
+
+      const sigLine = sig ? `\n(${sig})` : "";
+      return `${headline}${sigLine}`;
+    });
+
+    setDocManagement((prev) => {
+      const glue = prev?.trim() ? "\n\n" : "";
+      return `${prev || ""}${glue}${mgmtBlocks.join("\n\n")}`;
+    });
+
+    setDistributedList((prev) => [
+      ...prev,
+      ...valid.map((r) => ({
+        classification: r.classification,
+        name: r.name,
+        qty: Number(r.qty),
+        dosage: (r.dosage || "").trim(),
+        medicine_type: (r.medicine_type || "").trim(),
+        sig: (r.sig || "").trim(),
+      })),
+    ]);
+
+    setDistRows([{ classification: "", name: "", qty: "", dosage: "", medicine_type: "", sig: "" }]);
   };
+
   const addAllPrescribedToList = () => {
     const valid = rxRows.filter(
       (r) => r.classification && r.name && Number(r.qty) > 0 && Number.isFinite(Number(r.qty))
@@ -235,10 +282,6 @@ export default function DoctorQueueChart() {
     }
     setPrescribedList((prev) => [...prev, ...valid.map((r) => ({ ...r, qty: Number(r.qty) }))]);
     setRxRows([{ classification: "", name: "", qty: "", nameMode: "dropdown" }]);
-  };
-  const removePreviewItem = (kind, idx) => {
-    if (kind === "dist") setDistributedList((arr) => arr.filter((_, i) => i !== idx));
-    else setPrescribedList((arr) => arr.filter((_, i) => i !== idx));
   };
 
   const handlePrintPreview = () => window.print();
@@ -252,7 +295,6 @@ export default function DoctorQueueChart() {
     if (error) throw error;
   }
 
-  // decrement inventory FIFO by (classification + medicine_name) and soonest expiry
   async function decrementInventoryForDistributed(items) {
     for (const item of items) {
       let toTake = Number(item.qty) || 0;
@@ -288,51 +330,60 @@ export default function DoctorQueueChart() {
   }
 
   const saveChart = async () => {
-    if (!rec) return;
-    try {
-      setSaving(true);
-      setBanner(null);
+  if (!rec) return;
+  try {
+    setSaving(true);
+    setBanner(null);
 
-      const { data: sess } = await supabase.auth.getSession();
-      const uid = sess?.session?.user?.id;
-      const { data: me } = await supabase.from("profiles").select("firstname,surname").eq("id", uid).single();
-      const doctor_full_name = me ? `${me.firstname ?? ""} ${me.surname ?? ""}`.trim() : null;
+    const { data: sess } = await supabase.auth.getSession();
+    const uid = sess?.session?.user?.id;
+    const { data: me } = await supabase
+      .from("profiles")
+      .select("firstname,surname")
+      .eq("id", uid)
+      .single();
+    const doctor_full_name = me ? `${me.firstname ?? ""} ${me.surname ?? ""}`.trim() : null;
 
-      const combinedNotes =
-        `Assessment / Diagnosis:\n${(docAssessment || "").trim()}\n\n` +
-        `Management:\n${(docManagement || "").trim()}`;
+    const combinedNotes =
+      `Assessment / Diagnosis:\n${(docAssessment || "").trim()}\n\n` +
+      `Management:\n${(docManagement || "").trim()}`;
 
-      // 1) save patient record
-      const { error: upErr } = await supabase
-        .from("patient_records")
-        .update({
-          doctor_assessment: docAssessment || null,
-          doctor_management: docManagement || null,
-          doctor_notes: combinedNotes || null,
-          doctor_id: uid,
-          doctor_full_name,
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          queued: false,
-        })
-        .eq("id", rec.record_id);
-      if (upErr) throw upErr;
+    const { error: upErr } = await supabase
+      .from("patient_records")
+      .update({
+        doctor_assessment: docAssessment || null,
+        doctor_management: docManagement || null,
+        doctor_notes: combinedNotes || null,
+        doctor_id: uid,
+        doctor_full_name,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        queued: false,
+      })
+      .eq("id", rec.record_id);
+    if (upErr) throw upErr;
 
-      // 2) save medicines doc
-      await saveMedicinesDocument(rec.record_id);
+    // NEW: clear patient's queued flag so all queues stay in sync
+    const { error: patClearErr } = await supabase
+      .from("patients")
+      .update({ queued: false, queued_at: null })
+      .eq("id", rec.patient_id);
+    if (patClearErr) throw patClearErr;
 
-      // 3) decrement inventory for distributed only
-      await decrementInventoryForDistributed(distributedList);
-      await logDispenseTransactions(distributedList, rec);  
-      setBanner({ type: "ok", msg: "Chart saved. Inventory updated and medicines recorded." });
-      nav("/doctor/queue");
-    } catch (e) {
-      console.error(e);
-      setBanner({ type: "err", msg: e.message || "Save failed" });
-    } finally {
-      setSaving(false);
-    }
-  };
+    await saveMedicinesDocument(rec.record_id);
+    await decrementInventoryForDistributed(distributedList);
+    await logDispenseTransactions(distributedList, rec);
+
+    setBanner({ type: "ok", msg: "Chart saved. Inventory updated and medicines recorded." });
+    nav("/doctor/queue");
+  } catch (e) {
+    console.error(e);
+    setBanner({ type: "err", msg: e.message || "Save failed" });
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   if (!rec) {
     return (
@@ -343,49 +394,59 @@ export default function DoctorQueueChart() {
       </div>
     );
   }
-async function logDispenseTransactions(items, rec) {
+
+  async function logDispenseTransactions(items, rec) {
   if (!items.length) return;
   const { data: sess } = await supabase.auth.getSession();
   const staff_id = sess?.session?.user?.id ?? null;
 
+  // Build a pretty patient name once
+  const patient_name = [rec.first_name, rec.middle_name, rec.surname]
+    .filter(Boolean)
+    .join(" ");
+
   for (const it of items) {
-    // Try to infer dosage_form from catalog first, else from non-expired inventory lot
-    let dosage_form = null;
+    let dosage_form = it.medicine_type || null;
 
-    const { data: cat } = await supabase
-      .from("medicine_catalog")
-      .select("dosage_form")
-      .eq("classification", it.classification)
-      .eq("medicine_name", it.name)
-      .maybeSingle();
-
-    if (cat?.dosage_form) dosage_form = cat.dosage_form;
-    else {
-      const { data: invLot } = await supabase
-        .from("medicine_inventory")
+    if (!dosage_form) {
+      const { data: cat } = await supabase
+        .from("medicine_catalog")
         .select("dosage_form")
         .eq("classification", it.classification)
         .eq("medicine_name", it.name)
-        .gte("expiration_date", manilaDate)
-        .order("expiration_date", { ascending: true })
-        .limit(1)
         .maybeSingle();
-      dosage_form = invLot?.dosage_form ?? null;
+      if (cat?.dosage_form) dosage_form = cat.dosage_form;
+      else {
+        const { data: invLot } = await supabase
+          .from("medicine_inventory")
+          .select("dosage_form")
+          .eq("classification", it.classification)
+          .eq("medicine_name", it.name)
+          .gte("expiration_date", manilaDate) // already using Manila
+          .order("expiration_date", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        dosage_form = invLot?.dosage_form ?? null;
+      }
     }
 
     await supabase.from("medicine_transactions").insert({
-      direction: "out",
-      classification: it.classification,
-      medicine_name: it.name,
-      dosage_form,
-      quantity: Number(it.qty) || 0,
-      record_id: rec.record_id,
-      patient_id: rec.patient_id,
-      staff_id,
-      note: "Distributed via DoctorQueueChart",
-    });
+  direction: "out",
+  classification: it.classification,
+  medicine_name: it.name,
+  dosage_form,
+  quantity: Number(it.qty) || 0,
+  record_id: rec.record_id,
+  patient_id: rec.patient_id,   // keep
+  staff_id,
+  note: "Distributed via DoctorQueueChart",
+});
+
   }
 }
+
+
+
 
   return (
     <div className="stack pt-1">
@@ -397,409 +458,364 @@ async function logDispenseTransactions(items, rec) {
         back
       </button>
 
-      <div className="tabs">
-        <button className={`tab ${tab === "day" ? "tab--active" : ""}`} onClick={() => setTab("day")}>Day Chart</button>
-        <button className={`tab ${tab === "past" ? "tab--active" : ""}`} onClick={() => setTab("past")}>Past Records</button>
-      </div>
+      {/* ====== Main Day Chart (tabs removed) ====== */}
+      {docView === "none" && (
+        <div className="stack">
+          <PatientHeader patient={activeWithDisplays} />
+          <div className="grid-2">
+            <div className="panel">
+              <div className="panel__title">Doctor’s Notes</div>
 
-      {tab === "day" && (
-        <>
-          {docView === "none" && (
-            <div className="stack">
-              <PatientHeader patient={activeWithDisplays} />
-              <div className="grid-2">
-                <div className="panel">
-                  <div className="panel__title">Doctor’s Notes</div>
+              <div className="small muted" style={{ marginBottom: 6 }}>Assessment / Diagnosis</div>
+              <textarea
+                className="textarea"
+                placeholder="e.g., Acute sinusitis"
+                value={docAssessment}
+                onChange={(e) => setDocAssessment(e.target.value)}
+              />
 
-                  <div className="small muted" style={{ marginBottom: 6 }}>Assessment / Diagnosis</div>
-                  <textarea
-                    className="textarea"
-                    placeholder="e.g., Acute sinusitis"
-                    value={docAssessment}
-                    onChange={(e) => setDocAssessment(e.target.value)}
-                  />
+              <div className="small muted" style={{ marginTop: 10, marginBottom: 6 }}>Management</div>
+              <textarea
+                className="textarea"
+                placeholder="e.g., Amoxicillin 500 mg PO TID x 7 days; hydration; rest"
+                value={docManagement}
+                onChange={(e) => setDocManagement(e.target.value)}
+              />
+            </div>
 
-                  <div className="small muted" style={{ marginTop: 10, marginBottom: 6 }}>Management</div>
-                  <textarea
-                    className="textarea"
-                    placeholder="e.g., Amoxicillin 500 mg PO TID x 7 days; hydration; rest"
-                    value={docManagement}
-                    onChange={(e) => setDocManagement(e.target.value)}
-                  />
-                </div>
+            <NurseBlock record={rec} />
+          </div>
 
-                <NurseBlock record={rec} />
-              </div>
+          {/* ====== MEDICINE SECTION (unchanged functionality) ====== */}
+          <div className="panel">
+            <div className="panel__title">Medicine</div>
+            <div className="small" style={{ fontWeight: 700, marginTop: 4 }}>Medicine Consumption</div>
 
-              {/* ====== MEDICINE SECTION (Inventory-like layout) ====== */}
-              <div className="panel">
-                <div className="panel__title">Medicine</div>
-                <div className="small" style={{ fontWeight: 700, marginTop: 4 }}>Medicine Consumption</div>
+            <div className="stack" style={{ alignItems: "stretch" }}>
+              {/* Distributed */}
+              <div className="card card--form" style={{ marginTop: 8 }}>
+                <h4 className="card__title">Medicine Distributed</h4>
 
-                {/* Two-column: left forms, right preview */}
-                <div className="grid-2" style={{ alignItems: "start" }}>
-                  {/* LEFT: forms */}
-                  <div className="stack">
-                    {/* Distributed */}
-                    <div className="card card--form" style={{ marginTop: 8 }}>
-                      <h4 className="card__title">Medicine Distributed</h4>
-                      {distRows.map((row, i) => (
-                        <div className="grid" key={`dist-${i}`} style={{ alignItems: "end" }}>
-                          <div className="field">
-                            <label className="label">Medicine Classification</label>
-                            <select
-                              className="input"
-                              value={row.classification}
-                              onChange={(e) => updateDistRow(i, { classification: e.target.value })}
-                            >
-                              <option value="">Select classification</option>
-                              {classifications.map((c) => (
-                                <option key={c} value={c}>{c}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="field">
-                            <label className="label">Medicine Name</label>
-                            <select
-                              className="input"
-                              value={row.name}
-                              onChange={(e) => updateDistRow(i, { name: e.target.value })}
-                              disabled={!row.classification}
-                            >
-                              <option value="">{row.classification ? "Select medicine" : "Select classification first"}</option>
-                              {namesForClass(row.classification).map((n) => (
-                                <option key={n} value={n}>{n}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="field">
-                            <label className="label">Quantity</label>
-                            <input
-                              type="number"
-                              min={1}
-                              step={1}
-                              className="input"
-                              value={row.qty}
-                              onChange={(e) => updateDistRow(i, { qty: e.target.value })}
-                            />
-                          </div>
-
-                          <div className="field">
-                            {distRows.length > 1 && (
-                              <button type="button" className="btn btn--outline" onClick={() => removeDistRow(i)}>
-                                Remove
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-
-                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <button type="button" className="btn btn--outline" onClick={addDistRow}>
-                          + Add another medicine
-                        </button>
-                        <button type="button" className="btn btn--orange" onClick={addAllDistributedToList}>
-                          Add to List
-                        </button>
-                      </div>
+                {distRows.map((row, i) => (
+                  <div className="grid" key={`dist-${i}`} style={{ alignItems: "end" }}>
+                    <div className="field">
+                      <label className="label">Medicine Classification</label>
+                      <select
+                        className="input"
+                        value={row.classification}
+                        onChange={(e) => updateDistRow(i, { classification: e.target.value })}
+                      >
+                        <option value="">Select classification</option>
+                        {classifications.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
                     </div>
 
-                    {/* Prescribed */}
-                    <div className="card card--form" style={{ marginTop: 12 }}>
-                      <h4 className="card__title">Medicine Prescribed</h4>
-                      {rxRows.map((row, i) => (
-                        <div className="grid" key={`rx-${i}`} style={{ alignItems: "end" }}>
-                          <div className="field">
-                            <label className="label">Medicine Classification</label>
-                            <select
-                              className="input"
-                              value={row.classification}
-                              onChange={(e) => updateRxRow(i, { classification: e.target.value })}
-                            >
-                              <option value="">Select classification</option>
-                              {classifications.map((c) => (
-                                <option key={c} value={c}>{c}</option>
-                              ))}
-                            </select>
-                          </div>
+                    <div className="field">
+                      <label className="label">Medicine Name</label>
+                      <select
+                        className="input"
+                        value={row.name}
+                        onChange={(e) => updateDistRow(i, { name: e.target.value })}
+                        disabled={!row.classification}
+                      >
+                        <option value="">{row.classification ? "Select medicine" : "Select classification first"}</option>
+                        {namesForClass(row.classification).map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                          <div className="field">
-                            <label className="label">Medicine Name</label>
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <select
-                                className="input"
-                                value={row.nameMode === "dropdown" ? row.name : ""}
-                                onChange={(e) => updateRxRow(i, { nameMode: "dropdown", name: e.target.value })}
-                                disabled={row.nameMode !== "dropdown"}
-                              >
-                                <option value="">{row.classification ? "Select medicine" : "Select classification first"}</option>
-                                {namesForClass(row.classification).map((n) => (
-                                  <option key={n} value={n}>{n}</option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                className="btn btn--outline"
-                                onClick={() => updateRxRow(i, { nameMode: "manual", name: "" })}
-                              >
-                                Manual Input
-                              </button>
-                            </div>
-                            {row.nameMode === "manual" && (
-                              <input
-                                className="input mt-2"
-                                placeholder="Type medicine name"
-                                value={row.name}
-                                onChange={(e) => updateRxRow(i, { name: e.target.value })}
-                              />
-                            )}
-                          </div>
+                    <div className="field">
+                      <label className="label">Dosage</label>
+                      <input
+                        className="input"
+                        placeholder="e.g. 500mg"
+                        value={row.dosage}
+                        onChange={(e) => updateDistRow(i, { dosage: e.target.value })}
+                      />
+                    </div>
 
-                          <div className="field">
-                            <label className="label">Quantity</label>
-                            <input
-                              type="number"
-                              min={1}
-                              step={1}
-                              className="input"
-                              value={row.qty}
-                              onChange={(e) => updateRxRow(i, { qty: e.target.value })}
-                            />
-                          </div>
+                    <div className="field">
+                      <label className="label">Medicine Type</label>
+                      <select
+                        className="input"
+                        value={row.medicine_type}
+                        onChange={(e) => updateDistRow(i, { medicine_type: e.target.value })}
+                      >
+                        <option value="">Select type</option>
+                        <option value="capsule">capsule</option>
+                        <option value="tablet">tablet</option>
+                        <option value="syrup">syrup</option>
+                        <option value="suspension">suspension</option>
+                        <option value="drop">drop</option>
+                        <option value="ointment">ointment</option>
+                        <option value="cream">cream</option>
+                        <option value="injection">injection</option>
+                      </select>
+                    </div>
 
-                          <div className="field">
-                            {rxRows.length > 1 && (
-                              <button type="button" className="btn btn--outline" onClick={() => removeRxRow(i)}>
-                                Remove
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                    <div className="field">
+                      <label className="label">Quantity</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        className="input"
+                        value={row.qty}
+                        onChange={(e) => updateDistRow(i, { qty: e.target.value })}
+                      />
+                    </div>
 
-                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <button type="button" className="btn btn--outline" onClick={addRxRow}>
-                          + Add another medicine
+                    <div className="field" style={{ gridColumn: "1 / -2" }}>
+                      <label className="label">Sig</label>
+                      <textarea
+                        className="textarea"
+                        placeholder="e.g. 1 tab every 12 hrs for pain"
+                        value={row.sig}
+                        onChange={(e) => updateDistRow(i, { sig: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="field">
+                      {distRows.length > 1 && (
+                        <button type="button" className="btn btn--outline" onClick={() => removeDistRow(i)}>
+                          Remove
                         </button>
-                        <button type="button" className="btn btn--orange" onClick={addAllPrescribedToList}>
-                          Add to List
-                        </button>
-                      </div>
+                      )}
                     </div>
                   </div>
+                ))}
 
-                  {/* RIGHT: preview */}
-                  <div className="card" style={{ marginTop: 8 }}>
-                    <h4 className="card__title">Medicine Preview</h4>
-
-                    {/* Distributed table */}
-                    <h5 className="small" style={{ marginTop: 6, marginBottom: 4 }}>Distributed</h5>
-                    <div className="table-wrap">
-                      <table className="table">
-                        <thead>
-                          <tr>
-                            <th>Classification</th>
-                            <th>Medicine Name</th>
-                            <th>Quantity</th>
-                            <th></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {distributedList.length ? (
-                            distributedList.map((item, i) => (
-                              <tr key={`drow-${i}`} className={i % 2 ? "is-even" : "is-odd"}>
-                                <td>{item.classification}</td>
-                                <td>{item.name}</td>
-                                <td>{item.qty}</td>
-                                <td>
-                                  <button className="btn btn--outline" onClick={() => removePreviewItem("dist", i)}>
-                                    Remove
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan="4" className="table-empty">No distributed medicines added.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Prescribed table */}
-                    <h5 className="small" style={{ marginTop: 12, marginBottom: 4 }}>Prescribed</h5>
-                    <div className="table-wrap">
-                      <table className="table">
-                        <thead>
-                          <tr>
-                            <th>Classification</th>
-                            <th>Medicine Name</th>
-                            <th>Quantity</th>
-                            <th></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {prescribedList.length ? (
-                            prescribedList.map((item, i) => (
-                              <tr key={`prow-${i}`} className={i % 2 ? "is-even" : "is-odd"}>
-                                <td>{item.classification}</td>
-                                <td>{item.name}</td>
-                                <td>{item.qty}</td>
-                                <td>
-                                  <button className="btn btn--outline" onClick={() => removePreviewItem("rx", i)}>
-                                    Remove
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan="4" className="table-empty">No prescribed medicines added.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div style={{ marginTop: 8 }}>
-                      <button className="btn btn--outline" onClick={handlePrintPreview}>
-                        Download PDF
-                      </button>
-                    </div>
-                  </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  
+                  <button type="button" className="btn btn--orange" onClick={addAllDistributedToList}>
+                    Add to List
+                  </button>
                 </div>
               </div>
-              {/* ====== END MEDICINE SECTION ====== */}
 
-              <div className="inline-links">
-                <button className="link" onClick={() => setDocView("referral")}>Referral Form</button>
-                <button className="link" onClick={() => setDocView("prescription")}>Prescription Sheet</button>
-                <button className="link" onClick={() => setDocView("lab")}>Laboratory Request</button>
-                <button className="link" onClick={() => setDocView("medcert")}>Medical Certificate</button>
-              </div>
+              {/* Prescribed */}
+              <div className="card card--form" style={{ marginTop: 12 }}>
+                <h4 className="card__title">Medicine Prescribed</h4>
+                {rxRows.map((row, i) => (
+                  <div className="grid" key={`rx-${i}`} style={{ alignItems: "end" }}>
+                    <div className="field">
+                      <label className="label">Medicine Classification</label>
+                      <select
+                        className="input"
+                        value={row.classification}
+                        onChange={(e) => updateRxRow(i, { classification: e.target.value })}
+                      >
+                        <option value="">Select classification</option>
+                        {classifications.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
 
-              <div className="pt-1">
-                <button
-                  onClick={() => {
-                    if (!docAssessment?.trim() || !docManagement?.trim()) {
-                      alert("Fill in both Assessment/Diagnosis and Management.");
-                      return;
-                    }
-                    if (!window.confirm("Finalize this chart?")) return;
-                    saveChart();
-                  }}
-                  disabled={!(!saving && docAssessment?.trim() && docManagement?.trim())}
-                  className="btn btn--primary-wide"
-                >
-                  {saving ? "Saving…" : "Save Chart"}
-                </button>
+                    <div className="field">
+                      <label className="label">Medicine Name</label>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <select
+                          className="input"
+                          value={row.nameMode === "dropdown" ? row.name : ""}
+                          onChange={(e) => updateRxRow(i, { nameMode: "dropdown", name: e.target.value })}
+                          disabled={row.nameMode !== "dropdown"}
+                        >
+                          <option value="">{row.classification ? "Select medicine" : "Select classification first"}</option>
+                          {namesForClass(row.classification).map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="btn btn--outline"
+                          onClick={() => updateRxRow(i, { nameMode: "manual", name: "" })}
+                        >
+                          Manual Input
+                        </button>
+                      </div>
+                      {row.nameMode === "manual" && (
+                        <input
+                          className="input mt-2"
+                          placeholder="Type medicine name"
+                          value={row.name}
+                          onChange={(e) => updateRxRow(i, { name: e.target.value })}
+                        />
+                      )}
+                    </div>
+
+                    <div className="field">
+                      <label className="label">Quantity</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        className="input"
+                        value={row.qty}
+                        onChange={(e) => updateRxRow(i, { qty: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="field">
+                      {rxRows.length > 1 && (
+                        <button type="button" className="btn btn--outline" onClick={() => removeRxRow(i)}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                 
+                  <button type="button" className="btn btn--orange" onClick={addAllPrescribedToList}>
+                    Add to List
+                  </button>
+                </div>
               </div>
             </div>
-          )}
+          </div>
+          {/* ====== END MEDICINE SECTION ====== */}
 
-          {docView === "referral" && (
-            <ReferralForm
-              active={rec}
-              onBack={() => setDocView("none")}
-              onSavePdf={async (form) => {
-                try {
-                  if (!window.confirm("Save this referral and open Save as PDF?")) return;
-                  const filename = `REFERRAL_${rec.family_number}_${fullName(rec)}_${fmtDate(new Date()).replace(/\//g, "-")}.pdf`;
-                  await supabase.from("record_documents").insert({ record_id: rec.record_id, type: "referral", payload: form, filename });
-                  setBanner({ type: "ok", msg: "Referral saved. Choose 'Save as PDF' in the dialog." });
-                  setTimeout(() => window.print(), 150);
-                } catch (e) { setBanner({ type: "err", msg: e.message || "Failed to save referral" }); }
-              }}
-            />
-          )}
+          {/* ====== DOCUMENT REQUESTS ====== */}
+          <div className="inline-links">
+            <button className="link" onClick={() => setDocView("referral")}>Referral Form</button>
+            <button className="link" onClick={() => setDocView("prescription")}>Prescription Sheet</button>
+            <button className="link" onClick={() => setDocView("lab")}>Laboratory Request</button>
+            <button className="link" onClick={() => setDocView("medcert")}>Medical Certificate</button>
+          </div>
 
-          {docView === "prescription" && (
-            <PrescriptionForm
-              active={rec}
-              onBack={() => setDocView("none")}
-              onSavePdf={async (form) => {
-                try {
-                  if (!window.confirm("Save this prescription and open Save as PDF?")) return;
-                  const filename = `PRESCRIPTION_${rec.family_number}_${fullName(rec)}_${fmtDate(new Date()).replace(/\//g, "-")}.pdf`;
-                  await supabase.from("record_documents").insert({ record_id: rec.record_id, type: "prescription", payload: form, filename });
-                  setBanner({ type: "ok", msg: "Prescription saved. Choose 'Save as PDF' in the dialog." });
-                  setTimeout(() => window.print(), 150);
-                } catch (e) { setBanner({ type: "err", msg: e.message || "Failed to save prescription" }); }
-              }}
-            />
-          )}
+          {/* ====== PAST VISITS (centered, narrower) ====== */}
+          <div className="panel" style={{ margin: "10px 20px 0", padding: "12px 16px" }}>
+            <div className="panel__title">Past Visits</div>
+            {loadingPast && <div className="muted small">Loading…</div>}
+            {!loadingPast && past.length === 0 && <div className="muted small">No past records found.</div>}
 
-          {docView === "lab" && (
-            <LabRequestForm
-              active={rec}
-              onBack={() => setDocView("none")}
-              onSavePdf={async (form) => {
-                try {
-                  if (!window.confirm("Save this laboratory request and open Save as PDF?")) return;
-                  const filename = `LABREQ_${rec.family_number}_${fullName(rec)}_${fmtDate(new Date()).replace(/\//g, "-")}.pdf`;
-                  await supabase.from("record_documents").insert({ record_id: rec.record_id, type: "lab", payload: form, filename });
-                  setBanner({ type: "ok", msg: "Laboratory request saved. Choose 'Save as PDF' in the dialog." });
-                  setTimeout(() => window.print(), 150);
-                } catch (e) { setBanner({ type: "err", msg: e.message || "Failed to save laboratory request" }); }
-              }}
-            />
-          )}
+            {pastView === "menu" && past.map((r) => (
+              <div key={r.id} className="past-row">
+                <button className="link" onClick={() => { setSelectedPast(r); setPastView("detail"); }}>
+                  {fmtDate(r.completed_at || r.visit_date || r.created_at)}
+                </button>
+                <div className="past-row__doc small">{r.doctor_full_name || "—"}</div>
+              </div>
+            ))}
 
-          {docView === "medcert" && (
-            <MedCertForm
-              active={rec}
-              onBack={() => setDocView("none")}
-              onSavePdf={async (form) => {
-                try {
-                  if (!window.confirm("Save this medical certificate and open Save as PDF?")) return;
-                  const filename = `MEDCERT_${rec.family_number}_${fullName(rec)}_${fmtDate(new Date()).replace(/\//g, "-")}.pdf`;
-                  await supabase.from("record_documents").insert({ record_id: rec.record_id, type: "medcert", payload: form, filename });
-                  setBanner({ type: "ok", msg: "Medical certificate saved. Choose 'Save as PDF' in the dialog." });
-                  setTimeout(() => window.print(), 150);
-                } catch (e) { setBanner({ type: "err", msg: e.message || "Failed to save medical certificate" }); }
+            {pastView === "detail" && selectedPast && (
+              <PastRecordDetail
+                rec={selectedPast}
+                active={rec}
+                onBack={() => { setPastView("menu"); setSelectedPast(null); }}
+                onViewChart={() => setPastView("chart")}
+                onViewDocs={() => setPastView("docs")}
+              />
+            )}
+
+            {pastView === "chart" && selectedPast && (
+              <PastChartView rec={selectedPast} active={rec} onBack={() => setPastView("detail")} />
+            )}
+
+            {pastView === "docs" && selectedPast && (
+              <PastDocumentsView rec={selectedPast} onBack={() => setPastView("detail")} />
+            )}
+          </div>
+
+          {/* ====== ACTIONS: Discard + Save (visible) ====== */}
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", maxWidth: 560, margin: "16px auto 0" }}>
+            <button
+              className="btn btn--outline"
+              style={{ borderColor: "#d33", color: "#d33", minWidth: 180 }}
+              onClick={() => {
+                if (window.confirm("Discard changes to this chart?")) nav("/doctor/queue");
               }}
-            />
-          )}
-        </>
+            >
+              Discard
+            </button>
+            <button
+              onClick={() => {
+                if (!docAssessment?.trim() || !docManagement?.trim()) {
+                  alert("Fill in both Assessment/Diagnosis and Management.");
+                  return;
+                }
+                if (!window.confirm("Finalize this chart?")) return;
+                saveChart();
+              }}
+              disabled={!canSave}
+              className="btn btn--primary"
+              style={{ minWidth: 180 }}
+            >
+              {saving ? "Saving…" : "Save Chart"}
+            </button>
+          </div>
+        </div>
       )}
 
-      {tab === "past" && (
-        <div className="stack">
-          {loadingPast && <div className="muted small">Loading…</div>}
-          {!loadingPast && past.length === 0 && <div className="muted small">No past records found.</div>}
+      {/* ====== Document sub-views (unchanged) ====== */}
+      {docView === "referral" && (
+        <ReferralForm
+          active={rec}
+          onBack={() => setDocView("none")}
+          onSavePdf={async (form) => {
+            try {
+              if (!window.confirm("Save this referral and open Save as PDF?")) return;
+              const filename = `REFERRAL_${rec.family_number}_${fullName(rec)}_${fmtDate(new Date()).replace(/\//g, "-")}.pdf`;
+              await supabase.from("record_documents").insert({ record_id: rec.record_id, type: "referral", payload: form, filename });
+              setBanner({ type: "ok", msg: "Referral saved. Choose 'Save as PDF' in the dialog." });
+              setTimeout(() => window.print(), 150);
+            } catch (e) { setBanner({ type: "err", msg: e.message || "Failed to save referral" }); }
+          }}
+        />
+      )}
 
-          {pastView === "menu" && past.map((r) => (
-            <div key={r.id} className="past-row">
-              <button className="link" onClick={() => { setSelectedPast(r); setPastView("detail"); }}>
-                {fmtDate(r.completed_at || r.visit_date || r.created_at)}
-              </button>
-              <div className="past-row__doc small">{r.doctor_full_name || "—"}</div>
-            </div>
-          ))}
+      {docView === "prescription" && (
+        <PrescriptionForm
+          active={rec}
+          onBack={() => setDocView("none")}
+          onSavePdf={async (form) => {
+            try {
+              if (!window.confirm("Save this prescription and open Save as PDF?")) return;
+              const filename = `PRESCRIPTION_${rec.family_number}_${fullName(rec)}_${fmtDate(new Date()).replace(/\//g, "-")}.pdf`;
+              await supabase.from("record_documents").insert({ record_id: rec.record_id, type: "prescription", payload: form, filename });
+              setBanner({ type: "ok", msg: "Prescription saved. Choose 'Save as PDF' in the dialog." });
+              setTimeout(() => window.print(), 150);
+            } catch (e) { setBanner({ type: "err", msg: e.message || "Failed to save prescription" }); }
+          }}
+        />
+      )}
 
-          {pastView === "detail" && selectedPast && (
-            <PastRecordDetail
-              rec={selectedPast}
-              active={rec}
-              onBack={() => { setPastView("menu"); setSelectedPast(null); }}
-              onViewChart={() => setPastView("chart")}
-              onViewDocs={() => setPastView("docs")}
-            />
-          )}
+      {docView === "lab" && (
+        <LabRequestForm
+          active={rec}
+          onBack={() => setDocView("none")}
+          onSavePdf={async (form) => {
+            try {
+              if (!window.confirm("Save this laboratory request and open Save as PDF?")) return;
+              const filename = `LABREQ_${rec.family_number}_${fullName(rec)}_${fmtDate(new Date()).replace(/\//g, "-")}.pdf`;
+              await supabase.from("record_documents").insert({ record_id: rec.record_id, type: "lab", payload: form, filename });
+              setBanner({ type: "ok", msg: "Laboratory request saved. Choose 'Save as PDF' in the dialog." });
+              setTimeout(() => window.print(), 150);
+            } catch (e) { setBanner({ type: "err", msg: e.message || "Failed to save laboratory request" }); }
+          }}
+        />
+      )}
 
-          {pastView === "chart" && selectedPast && (
-            <PastChartView rec={selectedPast} active={rec} onBack={() => setPastView("detail")} />
-          )}
-
-          {pastView === "docs" && selectedPast && (
-            <PastDocumentsView rec={selectedPast} onBack={() => setPastView("detail")} />
-          )}
-        </div>
+      {docView === "medcert" && (
+        <MedCertForm
+          active={rec}
+          onBack={() => setDocView("none")}
+          onSavePdf={async (form) => {
+            try {
+              if (!window.confirm("Save this medical certificate and open Save as PDF?")) return;
+              const filename = `MEDCERT_${rec.family_number}_${fullName(rec)}_${fmtDate(new Date()).replace(/\//g, "-")}.pdf`;
+              await supabase.from("record_documents").insert({ record_id: rec.record_id, type: "medcert", payload: form, filename });
+              setBanner({ type: "ok", msg: "Medical certificate saved. Choose 'Save as PDF' in the dialog." });
+              setTimeout(() => window.print(), 150);
+            } catch (e) { setBanner({ type: "err", msg: e.message || "Failed to save medical certificate" }); }
+          }}
+        />
       )}
     </div>
   );
 }
- 

@@ -1,11 +1,10 @@
 // src/apps/admin/AccountManagement.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import "./AccountManagement.css"; // external CSS (no Tailwind)
 
 const ORANGE = "#e9772e";
 
-/* -------- NEW helpers (role normalization + pretty name) -------- */
+/* helpers */
 const normalizeRole = (r) => String(r ?? "").trim().toUpperCase();
 const ROLE_SET = new Set(["DOCTOR", "NURSE", "BHW"]);
 const toTitle = (s) =>
@@ -25,7 +24,6 @@ export default function AccountManagement() {
 
   useEffect(() => {
     let mounted = true;
-
     const load = async () => {
       const { data, error } = await supabase
         .from("profiles")
@@ -38,24 +36,14 @@ export default function AccountManagement() {
         setPeople([]);
         return;
       }
-
-      /* ------- CHANGED: normalize role & keep only the 3 roles ------- */
-      const rows = (data || []).map((u) => ({
-        ...u,
-        role: normalizeRole(u.role),
-      }));
+      const rows = (data || []).map((u) => ({ ...u, role: normalizeRole(u.role) }));
       setPeople(rows.filter((u) => ROLE_SET.has(u.role)));
     };
 
     load();
-
     const ch = supabase
       .channel("profiles_realtime_admin")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "profiles" },
-        load
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, load)
       .subscribe();
 
     return () => {
@@ -64,37 +52,28 @@ export default function AccountManagement() {
     };
   }, []);
 
-  // No scroll locking for inline form
-  useEffect(() => {}, [showNew]);
-
-  /* keep your original fullname function (not used for rendering anymore, but not deleted) */
   const fullname = (u) =>
-    [u.firstname, u.middle_initial ? `${u.middle_initial}.` : "", u.surname]
-      .filter(Boolean)
-      .join(" ");
+    [u.firstname, u.middle_initial ? `${u.middle_initial}.` : "", u.surname].filter(Boolean).join(" ");
 
-  /* ------- CHANGED: find by normalized role ------- */
-  const docInCharge =
-    people.find((u) => u.role === "DOCTOR" || u.role === "Doctor") || null;
-  const nurseInCharge =
-    people.find((u) => u.role === "NURSE" || u.role === "Nurse") || null;
+  const docInCharge = people.find((u) => u.role === "DOCTOR") || null;
+  const nurseInCharge = people.find((u) => u.role === "NURSE") || null;
 
   const term = q.trim().toLowerCase();
-  /* ------- CHANGED: filter BHW via normalized role + search pretty name ------- */
   const bhws = useMemo(() => {
-    const list = people.filter((u) => u.role === "BHW" || u.role === "bhw");
+    const list = people.filter((u) => u.role === "BHW");
     if (!term) return list;
     return list.filter((u) => fullNamePretty(u).toLowerCase().includes(term));
   }, [people, term]);
 
   return (
-    <section className="am-section">
-      <div className="am-toolbar">
-        <h3 className="am-title" style={{ color: ORANGE }}>
+    <section className="p-4">
+      {/* Toolbar */}
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-[15px] font-semibold" style={{ color: ORANGE }}>
           Account Management
         </h3>
         <button
-          className="btn btn--outline btn--sm"
+          className="inline-flex items-center rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
           onClick={() => setShowNew(true)}
         >
           + Add New Account
@@ -102,19 +81,18 @@ export default function AccountManagement() {
       </div>
 
       {/* Search */}
-      <div className="am-search">
-        <div className="am-search__wrap">
+      <div className="mb-2">
+        <div className="relative">
           <input
-            className="input input--search"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 pr-8 text-sm outline-none"
             placeholder="Search..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
           <svg
-            className="am-search__icon"
+            className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-60"
             xmlns="http://www.w3.org/2000/svg"
             fill="none" viewBox="0 0 24 24" stroke="currentColor"
-            aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
               d="m21 21-4.35-4.35m0 0A7.5 7.5 0 1 0 6.3 6.3a7.5 7.5 0 0 0 10.35 10.35Z" />
@@ -123,47 +101,34 @@ export default function AccountManagement() {
       </div>
 
       {/* Doctor-in-Charge */}
-      <RowLabel>Doctor-in-Charge</RowLabel>
-      <div className="am-row">
-        {docInCharge ? (
-          /* ------- CHANGED: pretty formatting ------- */
-          fullNamePretty(docInCharge)
-        ) : (
-          <span className="muted">No doctor assigned.</span>
-        )}
+      <div className="mb-1 text-xs text-slate-600">Doctor-in-Charge</div>
+      <div className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm">
+        {docInCharge ? fullNamePretty(docInCharge) : <span className="text-slate-500">No doctor assigned.</span>}
       </div>
 
       {/* Nurse-in-Charge */}
-      <RowLabel>Nurse-in-Charge</RowLabel>
-      <div className="am-row">
-        {nurseInCharge ? (
-          /* ------- CHANGED: pretty formatting ------- */
-          fullNamePretty(nurseInCharge)
-        ) : (
-          <span className="muted">No nurse assigned.</span>
-        )}
+      <div className="mt-2 mb-1 text-xs text-slate-600">Nurse-in-Charge</div>
+      <div className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm">
+        {nurseInCharge ? fullNamePretty(nurseInCharge) : <span className="text-slate-500">No nurse assigned.</span>}
       </div>
 
-      {/* Barangay Health Workers */}
-      <div className="am-subtitle" style={{ color: ORANGE }}>
+      {/* BHWs */}
+      <div className="mt-3 text-xs font-semibold" style={{ color: ORANGE }}>
         Barangay Health Workers
       </div>
 
-      <div className="am-bhwbox">
+      <div className="mt-1 rounded-md border border-slate-300 bg-white">
         {bhws.length ? (
-          <ul className="am-bhwlist">
+          <ul className="divide-y divide-slate-200">
             {bhws.map((u) => (
-              <li key={u.id} className="am-bhwitem">
-                <span className="am-bhwname">
-                  {/* ------- CHANGED: pretty formatting ------- */}
-                  {fullNamePretty(u)}
-                </span>
+              <li key={u.id} className="flex items-center justify-between px-2 py-1.5 text-sm">
+                <span className="truncate">{fullNamePretty(u)}</span>
                 <GreenToggle defaultChecked />
               </li>
             ))}
           </ul>
         ) : (
-          <div className="am-empty">None</div>
+          <div className="px-2 py-10 text-center text-slate-500">None</div>
         )}
       </div>
 
@@ -177,32 +142,28 @@ export default function AccountManagement() {
   );
 }
 
-function RowLabel({ children }) {
-  return <div className="am-rowlabel">{children}</div>;
-}
-
 function GreenToggle({ defaultChecked = true, onChange }) {
   return (
-    <label className="toggle">
+    <label className="inline-flex cursor-pointer items-center">
       <input
         type="checkbox"
         className="sr-only"
         defaultChecked={defaultChecked}
         onChange={onChange}
       />
-      <span className="toggle-track">
-        <span className="toggle-knob" />
+      <span className="relative block h-6 w-10 rounded-full bg-slate-300 transition-colors peer-checked:bg-emerald-500">
+        <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
       </span>
     </label>
   );
 }
 
-/* ---------------- New Account Modal ---------------- */
+/* -------------------- New Account Modal (Tailwind) -------------------- */
 
 function NewAccountModal({ onClose, onSaved }) {
-  // Make sure these exist BEFORE any render logic uses them
   const [confirmPasswordLocal, setConfirmPasswordLocal] = useState("");
-  const inputBase = "input";
+  const inputBase =
+    "w-full h-9 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-500";
 
   const [surname, setSurname] = useState("");
   const [firstname, setFirstname] = useState("");
@@ -230,6 +191,7 @@ function NewAccountModal({ onClose, onSaved }) {
     setTimeout(() => setToast(null), ms);
   };
 
+  /* validation (same as before) */
   const validateSurname = (v) =>
     !v ? "" : v.length < 3 ? "minimum is 3 letters" : v.length > 20 ? "maximum length is 20 letters only" : "";
   const validateFirstname = (v) => {
@@ -393,14 +355,11 @@ function NewAccountModal({ onClose, onSaved }) {
       return flashLocal("Passwords do not match.", "error");
     }
 
-    // Allow Admin here too (edge func also allows Admin)
     if (!["Doctor", "Nurse", "BHW", "Admin"].includes(role))
       return flashLocal("Role must be Doctor, Nurse, BHW, or Admin.", "error");
 
     try {
       setBusy(true);
-
-      // Call ONLY the edge function – it creates the auth user AND writes to profiles.
       const { data, error } = await supabase.functions.invoke("mirror_user_to_auth", {
         body: {
           email: email.trim().toLowerCase(),
@@ -414,7 +373,6 @@ function NewAccountModal({ onClose, onSaved }) {
       });
 
       if (error) {
-        // Surface the real error coming from the Edge Function
         const msg =
           (typeof error.context === "string" && error.context) ||
           (error.context && (error.context.error || error.context.message)) ||
@@ -423,9 +381,7 @@ function NewAccountModal({ onClose, onSaved }) {
         return flashLocal(msg, "error");
       }
 
-      if (!data?.ok) {
-        return flashLocal("Unexpected response from server.", "error");
-      }
+      if (!data?.ok) return flashLocal("Unexpected response from server.", "error");
 
       flashLocal("User created successfully.", "success");
       onSaved?.();
@@ -440,53 +396,63 @@ function NewAccountModal({ onClose, onSaved }) {
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal">
-        <button onClick={onClose} className="modal__close" aria-label="Close">✕</button>
-        <div className="modal__head">
-          <h4 className="modal__title" style={{ color: ORANGE }}>Create Account</h4>
-          <div className="modal__subtitle">Please fill in your details</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-xl rounded-xl bg-white shadow-lg">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <div>
+            <h4 className="text-lg font-semibold" style={{ color: ORANGE }}>
+              Create Account
+            </h4>
+            <p className="text-xs text-slate-500">Please fill in your details</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50"
+            aria-label="Close"
+          >
+            ✕
+          </button>
         </div>
 
-        <form onSubmit={createUser} className="modal__form" autoComplete="off">
-
-          {/* Full Name block (stacked) */}
-          <div className="name-stack">
-            <div className="stack-label">Full Name</div>
-
-            <div className="stack-field">
-              <input
-                className={inputBase}
-                value={surname}
-                onChange={onSurnameChange}
-                required
-                maxLength={21}
-                placeholder="Last name"
-              />
-              <ErrorText text={errors.surname} />
-            </div>
-
-            <div className="stack-field">
-              <input
-                className={inputBase}
-                value={firstname}
-                onChange={onFirstnameChange}
-                required
-                maxLength={21}
-                placeholder="First name"
-              />
-              <ErrorText text={errors.firstname} />
-            </div>
-
-            <div className="stack-field">
-              <input
-                className={inputBase}
-                value={middleInitial}
-                onChange={onMIChange}
-                maxLength={1}
-                placeholder="M.I."
-              />
-              <ErrorText text={errors.middleInitial} />
+        {/* Form */}
+        <form onSubmit={createUser} className="px-5 py-4" autoComplete="off">
+          {/* Full Name */}
+          <div className="mb-3">
+            <div className="mb-1 text-xs text-slate-700">Full Name</div>
+            <div className="space-y-2">
+              <div>
+                <input
+                  className={inputBase}
+                  value={surname}
+                  onChange={onSurnameChange}
+                  required
+                  maxLength={21}
+                  placeholder="Last name"
+                />
+                <ErrorText text={errors.surname} />
+              </div>
+              <div>
+                <input
+                  className={inputBase}
+                  value={firstname}
+                  onChange={onFirstnameChange}
+                  required
+                  maxLength={21}
+                  placeholder="First name"
+                />
+                <ErrorText text={errors.firstname} />
+              </div>
+              <div>
+                <input
+                  className={inputBase}
+                  value={middleInitial}
+                  onChange={onMIChange}
+                  maxLength={1}
+                  placeholder="M.I."
+                />
+                <ErrorText text={errors.middleInitial} />
+              </div>
             </div>
           </div>
 
@@ -502,7 +468,7 @@ function NewAccountModal({ onClose, onSaved }) {
               placeholder="e.g., user@gmail.com"
             />
             <ErrorText text={errors.email} />
-            <p className="help">only @gmail.com • max 20 chars</p>
+            <p className="mt-1 text-xs text-slate-500">only @gmail.com • max 20 chars</p>
           </LabeledInput>
 
           {/* Username */}
@@ -516,7 +482,7 @@ function NewAccountModal({ onClose, onSaved }) {
               placeholder="5–10 chars, letters first"
             />
             <ErrorText text={errors.username || (usernameChecking ? "checking availability..." : "")} />
-            <p className="help">letters & numbers, allow . _ - (not at start/end)</p>
+            <p className="mt-1 text-xs text-slate-500">letters & numbers, allow . _ - (not at start/end)</p>
           </LabeledInput>
 
           {/* Password */}
@@ -535,23 +501,25 @@ function NewAccountModal({ onClose, onSaved }) {
                   setConfirmIssue(confirmPasswordIssue(raw, confirmPasswordLocal));
               }}
             />
+
             {password.length > 0 && (
-              <div className="pwd-meter">
-                <div className="pwd-meter__bar">
+              <div className="mt-1">
+                <div className="h-2 w-full overflow-hidden rounded bg-slate-200">
                   <div
-                    className={`pwd-meter__fill s${pwdScore}`}
+                    className={`h-2 transition-all ${["bg-red-400","bg-orange-400","bg-yellow-400","bg-lime-500","bg-emerald-500"][pwdScore]}`}
                     style={{ width: ["10%","25%","50%","75%","100%"][pwdScore] }}
                   />
                 </div>
-                <div className="pwd-meter__label">
-                  Strength: <span className="bold">{["Very weak","Weak","Fair","Good","Strong"][pwdScore]}</span>
+                <div className="mt-1 text-xs text-slate-700">
+                  Strength: <span className="font-semibold">{["Very weak","Weak","Fair","Good","Strong"][pwdScore]}</span>
                 </div>
               </div>
             )}
-            <ul className="pwd-issues">
-              {pwdIssues.map((m, i) => <li key={i}>• {m}</li>)}
+
+            <ul className="mt-1 list-disc pl-5 text-xs text-red-700">
+              {pwdIssues.map((m, i) => <li key={i}> {m}</li>)}
             </ul>
-            <p className="help">8–15 chars, include A–Z, a–z, 0–9, and one of ! @ # $ % ^ & *.</p>
+            <p className="mt-1 text-xs text-slate-500">8–15 chars, include A–Z, a–z, 0–9, and one of ! @ # $ % ^ & *.</p>
           </LabeledInput>
 
           {/* Confirm Password */}
@@ -581,18 +549,34 @@ function NewAccountModal({ onClose, onSaved }) {
             </select>
           </LabeledInput>
 
-          <button disabled={busy} className="btn btn--orange">
-            {busy ? "Saving..." : "Submit"}
-          </button>
+          {/* Actions */}
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Discard
+            </button>
+            <button
+              disabled={busy}
+              className="rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-60"
+            >
+              {busy ? "Saving..." : "Submit"}
+            </button>
+          </div>
 
           {toast && (
-            <div className={`toast ${
-              toast.type === "error"
-                ? "toast--error"
-                : toast.type === "success"
-                ? "toast--success"
-                : "toast--info"
-            }`}>
+            <div
+              className={[
+                "mt-3 rounded-md border px-3 py-2 text-sm",
+                toast.type === "error"
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : toast.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 bg-slate-50 text-slate-700",
+              ].join(" ")}
+            >
               {toast.msg}
             </div>
           )}
@@ -602,15 +586,15 @@ function NewAccountModal({ onClose, onSaved }) {
   );
 }
 
-/* small helpers */
+/* tiny subcomponents */
 function LabeledInput({ label, children }) {
   return (
-    <div className="labeled">
-      <label className="labeled__label">{label}</label>
+    <div className="mb-3">
+      <label className="mb-1 block text-xs text-slate-700">{label}</label>
       {children}
     </div>
   );
 }
 function ErrorText({ text }) {
-  return <p className="error-text">{text}</p>;
+  return <p className="mt-1 min-h-[1rem] text-xs text-red-700">{text}</p>;
 }

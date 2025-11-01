@@ -2,17 +2,79 @@ import React, { useEffect, useMemo, useState } from "react";
 import useFormPersist from "../../hooks/useFormPersist";
 import { supabase } from "../../lib/supabase";
 
+/* ---------- SHARED HELPERS (in-file to keep this self-contained) ---------- */
+// (If you prefer, move these to src/lib/validation.js and import.)
+const onlyDigits = (s = "") => String(s).replace(/\D/g, "");
+const lettersSpacesOnly = (s = "") => /^[A-Za-z\s]+$/.test(String(s).trim());
+const padFam = (numStr, width = 3) => onlyDigits(numStr || "0").padStart(width, "0");
+
+// nurse-style validations
+const validateBP = (bp) => {
+  const v = String(bp || "").trim();
+  if (!v) return ""; // keep your semantics: optional in Registration
+  const m = v.match(/^(\d{1,4})\/(\d{1,4})$/);
+  if (!m) return 'Blood Pressure must look like "120/80".';
+  const [, L, R] = m;
+  if (L.length >= 4 || R.length >= 4) return "4 digits is invalid for BP.";
+  const sys = Number(L), dia = Number(R);
+  if (isNaN(sys) || isNaN(dia)) return "Blood Pressure may only contain numbers and '/'.";
+  if (sys < dia) return "Systolic should be ≥ diastolic.";
+  if (sys < 70 || sys > 260 || dia < 40 || dia > 160) return "Blood pressure values look out of range.";
+  return "";
+};
+const validateHeightCm = (txt) => {
+  const str = String(txt || "");
+  if (!str) return ""; // optional here
+  const hasOneDot = (str.match(/\./g) || []).length <= 1;
+  const decOk = /^\d+(\.\d)?$/.test(str) || /^\d+\.$/.test(str);
+  const digits = onlyDigits(str);
+  if (!digits.length || digits.length > 5 || !hasOneDot || !decOk) return "Height must be up to 5 digits, 1 decimal (e.g., 163.6).";
+  const n = Number(str.endsWith(".") ? str.slice(0, -1) : str);
+  if (isNaN(n)) return "Height is not a number.";
+  if (n < 30 || n > 300) return "Height must be 30–300 cm.";
+  return "";
+};
+const validateWeightKg = (txt) => {
+  const str = String(txt || "");
+  if (!str) return ""; // optional here
+  const hasOneDot = (str.match(/\./g) || []).length <= 1;
+  const decOk = /^\d+(\.\d{0,2})?$/.test(str) || /^\d+\.$/.test(str);
+  const digits = onlyDigits(str);
+  if (!digits.length || digits.length > 4 || !hasOneDot || !decOk) return "Weight must be up to 4 digits; up to 2 decimals (e.g., 53.72).";
+  const n = Number(str.endsWith(".") ? str.slice(0, -1) : str);
+  if (isNaN(n)) return "Weight is not a number.";
+  if (n <= 0 || n > 500) return "Weight must be 1–500 kg.";
+  return "";
+};
+const validateTemperatureC = (txt) => {
+  const str = String(txt || "");
+  if (!str) return ""; // optional here
+  const hasOneDot = (str.match(/\./g) || []).length <= 1;
+  const decOk = /^\d+(\.\d{0,2})?$/.test(str) || /^\d+\.$/.test(str);
+  const digits = onlyDigits(str);
+  if (!digits.length || digits.length > 4 || !hasOneDot || !decOk) return "Temperature must be up to 4 digits; up to 2 decimals.";
+  const n = Number(str.endsWith(".") ? str.slice(0, -1) : str);
+  if (isNaN(n)) return "Temperature is not a number.";
+  if (n < 30 || n > 45) return "Temperature must be 30–45 °C.";
+  return "";
+};
+
+// +63 phone: UI collects 10 digits, we can save either E.164 or local 11.
+// Here we keep saving the local 11 to match your existing DB.
+const validatePhone10 = (digits) => {
+  const d = onlyDigits(digits).slice(0, 10);
+  if (d.length !== 10) return { error: "Must be 10 digits after +63.", e164: null, local11: null };
+  return { error: "", e164: `+63${d}`, local11: `0${d}` };
+};
+/* ------------------------------------------------------------------------ */
+
 /* ---------------- Patient Registration ---------------- */
-// showHeader: render the internal "Patient Registration" H2 (default true).
 function PatientRegistration({ onDone, showHeader = true }) {
   const initialForm = {
     familyNumber: "", surname: "", firstName: "", middleName: "",
     sex: "", birthdate: "", age: "", contactNumber: "",
-    // Existing field (kept): this will be the Emergency Contact Number
-    contactPerson: "",
-    // NEW fields:
-    emergencyPersonName: "",   // Contact Person (name)
-    emergencyRelation: "",     // Relation
+    contactPerson: "", // (your existing column used for Emergency Number)
+    emergencyPersonName: "", emergencyRelation: "",
     heightCm: "", weightKg: "", bloodPressure: "", temperatureC: "",
     chiefComplaint: "", proceedToQueue: false
   };
@@ -21,42 +83,30 @@ function PatientRegistration({ onDone, showHeader = true }) {
     initialForm
   );
   const [saving, setSaving] = useState(false);
-  const [note, setNote] = useState(null); // {type:'success'|'error', msg:string}
+  const [note, setNote] = useState(null);
 
-  // SAFE string helper (prevents .trim() on undefined)
+  // SAFE string helper
   const sv = (v) => (v ?? "").toString().trim();
 
-  // Cap date inputs to today
   const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // ---------- LIVE VALIDATIONS ----------
+  /* ---------- LIVE VALIDATIONS (kept + boosted where helpful) ---------- */
   const lettersOnlyBad = (s) => /[^A-Za-z\s]/.test(s || "");
 
+  // CHANGED: digits-only live error + we’ll auto-suggest next value on mount
   const familyNumberError = useMemo(() => {
     if (!form.familyNumber) return "";
     return /[^0-9]/.test(form.familyNumber) ? "Numbers only." : "";
   }, [form.familyNumber]);
 
-  const surnameError = useMemo(() => {
-    if (!form.surname) return "";
-    return lettersOnlyBad(form.surname) ? "Letters and spaces only." : "";
-  }, [form.surname]);
-
-  const firstNameError = useMemo(() => {
-    if (!form.firstName) return "";
-    return lettersOnlyBad(form.firstName) ? "Letters and spaces only." : "";
-  }, [form.firstName]);
-
-  const middleNameError = useMemo(() => {
-    if (!form.middleName) return ""; // blank allowed
-    return lettersOnlyBad(form.middleName) ? "Letters and spaces only." : "";
-  }, [form.middleName]);
+  const surnameError = useMemo(() => !form.surname ? "" : (lettersOnlyBad(form.surname) ? "Letters and spaces only." : ""), [form.surname]);
+  const firstNameError = useMemo(() => !form.firstName ? "" : (lettersOnlyBad(form.firstName) ? "Letters and spaces only." : ""), [form.firstName]);
+  const middleNameError = useMemo(() => !form.middleName ? "" : (lettersOnlyBad(form.middleName) ? "Letters and spaces only." : ""), [form.middleName]);
 
   const birthdateError = useMemo(() => {
     if (!form.birthdate) return "";
     const bd = new Date(form.birthdate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0,0,0,0);
     if (isNaN(bd.getTime())) return "Birthdate is invalid.";
     if (bd > today) return "Birthdate cannot be in the future.";
     return "";
@@ -64,23 +114,19 @@ function PatientRegistration({ onDone, showHeader = true }) {
 
   const { infantMonths, isInfant, birthdateYears } = useMemo(() => {
     if (!form.birthdate) return { infantMonths: 0, isInfant: false, birthdateYears: null };
-    const bd = new Date(form.birthdate);
-    if (isNaN(bd)) return { infantMonths: 0, isInfant: false, birthdateYears: null };
+    const bd = new Date(form.birthdate); if (isNaN(bd)) return { infantMonths: 0, isInfant: false, birthdateYears: null };
     const t = new Date();
-
     let years = t.getFullYear() - bd.getFullYear();
     const mDelta = t.getMonth() - bd.getMonth();
     if (mDelta < 0 || (mDelta === 0 && t.getDate() < bd.getDate())) years--;
-
     let months = (t.getFullYear() - bd.getFullYear()) * 12 + (t.getMonth() - bd.getMonth());
     if (t.getDate() < bd.getDate()) months--;
     months = Math.max(0, months);
-
     return { infantMonths: months, isInfant: months < 12, birthdateYears: Math.max(0, years) };
   }, [form.birthdate]);
 
   const ageError = useMemo(() => {
-    if (form.age === "" || form.age === null || form.age === undefined) return "";
+    if (form.age === "" || form.age == null) return "";
     const n = Number(form.age);
     if (!Number.isFinite(n)) return "Age must be a number.";
     if (n < 0) return "Age cannot be negative.";
@@ -88,33 +134,71 @@ function PatientRegistration({ onDone, showHeader = true }) {
     return "";
   }, [form.age]);
 
-  const bpError = useMemo(() => {
-    if (!form.bloodPressure) return "";
-    const s = String(form.bloodPressure);
-    const slashCount = (s.match(/\//g) || []).length;
-    if (/[^\d/]/.test(s)) return 'Only numbers and "/" are allowed.';
-    if (slashCount > 1) return 'Only one "/" is allowed.';
-    if (!/^\d{1,3}(?:\/\d{1,3})?$/.test(s)) return 'Format must be like "120/80".';
-    return "";
-  }, [form.bloodPressure]);
+  // CHANGED: BP, Height, Weight, Temp reflect nurse’s stricter rules (still optional here)
+  const bpError = useMemo(() => validateBP(form.bloodPressure), [form.bloodPressure]);
+  const heightErr = useMemo(() => validateHeightCm(form.heightCm), [form.heightCm]);
+  const weightErr = useMemo(() => validateWeightKg(form.weightKg), [form.weightKg]);
+  const tempErr   = useMemo(() => validateTemperatureC(form.temperatureC), [form.temperatureC]);
 
-  // NEW: live checks for emergency name / relation (letters + spaces only)
+  // NEW: live checks for emergency name / relation
   const emergencyNameError = useMemo(() => {
     if (!form.emergencyPersonName) return "";
-    return lettersOnlyBad(form.emergencyPersonName) ? "Letters and spaces only." : "";
+    return lettersSpacesOnly(form.emergencyPersonName) ? "" : "Letters and spaces only.";
   }, [form.emergencyPersonName]);
-
   const emergencyRelationError = useMemo(() => {
     if (!form.emergencyRelation) return "";
-    return lettersOnlyBad(form.emergencyRelation) ? "Letters and spaces only." : "";
+    return lettersSpacesOnly(form.emergencyRelation) ? "" : "Letters and spaces only.";
   }, [form.emergencyRelation]);
+
+  // NEW: phone UI keeps 10 digits; we store 11 on submit
+  const [uiContact10, setUiContact10] = useState("");            // for Contact Number (+63)
+  const [uiEmergency10, setUiEmergency10] = useState("");        // for Emergency Number (+63)
+  const [contactErr, setContactErr] = useState("");
+  const [emergencyNumErr, setEmergencyNumErr] = useState("");
+
+  // hydrate UI phones from persisted 11-digit on initial load (optional)
+  useEffect(() => {
+    if (form.contactNumber && !uiContact10) {
+      const d = onlyDigits(form.contactNumber);
+      if (d.length === 11 && d.startsWith("0")) setUiContact10(d.slice(1));
+    }
+    if (form.contactPerson && !uiEmergency10) {
+      const d = onlyDigits(form.contactPerson);
+      if (d.length === 11 && d.startsWith("0")) setUiEmergency10(d.slice(1));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [famLockSurname, setFamLockSurname] = useState(null);
   const [famLookupLoading, setFamLookupLoading] = useState(false);
   const norm = (s = "") => s.trim().toUpperCase();
   const set = (k, v) => setField(k, v);
 
-  // ----- VALIDATION (submit-time) -----
+  /* ---------- NEW: Auto-suggest next Family Number on mount ---------- */
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (sv(form.familyNumber)) return; // user already typed/persisted one
+        const { data, error } = await supabase
+          .from("patients")
+          .select("family_number")
+          .order("family_number", { ascending: false })
+          .limit(1);
+        if (error) throw error;
+        const max = data?.[0]?.family_number || "000";
+        const next = String(Number(onlyDigits(max)) + 1);
+        if (mounted) set("familyNumber", padFam(next, 3)); // e.g., "004"
+      } catch (e) {
+        // keep editable; no toast needed
+        console.warn("family_number lookup failed:", e?.message || e);
+      }
+    })();
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ----- VALIDATION (submit-time): keep yours, add phone + nurse rules ----- */
   const validate = () => {
     if (!sv(form.familyNumber)) return "Family Number is required.";
     if (!sv(form.surname)) return "Surname is required.";
@@ -129,11 +213,9 @@ function PatientRegistration({ onDone, showHeader = true }) {
     if (sv(form.middleName) && lettersOnlyBad(sv(form.middleName))) return "Middle Name must contain letters and spaces only.";
 
     const bd = new Date(sv(form.birthdate));
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0,0,0,0);
     if (isNaN(bd.getTime())) return "Birthdate is invalid.";
     if (bd > today) return "Birthdate cannot be in the future.";
-
     if (Number(form.age) > 120) return "Age must not exceed 120.";
     if (birthdateYears !== null && birthdateYears > 120) return "Birthdate implies age over 120.";
 
@@ -141,38 +223,34 @@ function PatientRegistration({ onDone, showHeader = true }) {
       return `Family Number is already assigned to surname "${famLockSurname}". Please use that surname or choose a different Family Number.`;
     }
 
-    if (sv(form.contactNumber) && sv(form.contactNumber).length !== 11)
-      return "Contact Number must be exactly 11 digits.";
-    if (sv(form.contactPerson) && sv(form.contactPerson).length !== 11)
-      return "Contact Person must be exactly 11 digits.";
-
-    const oneDec = /^\d+(\.\d)?$/;
-    if (sv(form.heightCm) && !oneDec.test(sv(form.heightCm))) return "Height must have at most 1 decimal place.";
-    if (sv(form.weightKg) && !oneDec.test(sv(form.weightKg))) return "Weight must have at most 1 decimal place.";
-    if (sv(form.temperatureC) && !oneDec.test(sv(form.temperatureC))) return "Temperature must have at most 1 decimal place.";
-
-    if (sv(form.bloodPressure)) {
-      const bp = sv(form.bloodPressure);
-      const slashCount = (bp.match(/\//g) || []).length;
-      if (/[^\d/]/.test(bp)) return 'Blood Pressure may only contain numbers and "/".';
-      if (slashCount > 1) return 'Blood Pressure may contain only one "/".';
-      if (!/^\d{1,3}(?:\/\d{1,3})?$/.test(bp)) return 'Blood Pressure must look like "120/80".';
+    // CHANGED: phones (+63 UI with 10 digits)
+    if (uiContact10) {
+      const { error } = validatePhone10(uiContact10);
+      if (error) return `Contact Number: ${error}`;
+    }
+    {
+      const { error } = validatePhone10(uiEmergency10);
+      if (error) return `Emergency Contact Number: ${error}`;
     }
 
-    // NEW required checks for Emergency section
+    // nurse-style detail checks (optional fields but if present must be valid)
+    if (validateBP(form.bloodPressure)) return validateBP(form.bloodPressure);
+    if (validateHeightCm(form.heightCm)) return validateHeightCm(form.heightCm);
+    if (validateWeightKg(form.weightKg)) return validateWeightKg(form.weightKg);
+    if (validateTemperatureC(form.temperatureC)) return validateTemperatureC(form.temperatureC);
+
+    // Emergency names/relations required
     if (!sv(form.emergencyPersonName)) return "Emergency Contact Person is required.";
-    if (lettersOnlyBad(sv(form.emergencyPersonName))) return "Emergency Contact Person must contain letters and spaces only.";
+    if (!lettersSpacesOnly(sv(form.emergencyPersonName))) return "Emergency Contact Person must contain letters and spaces only.";
     if (!sv(form.emergencyRelation)) return "Emergency Relation is required.";
-    if (lettersOnlyBad(sv(form.emergencyRelation))) return "Emergency Relation must contain letters and spaces only.";
-    if (!sv(form.contactPerson) || sv(form.contactPerson).length !== 11)
-      return "Emergency Contact Number must be exactly 11 digits.";
+    if (!lettersSpacesOnly(sv(form.emergencyRelation))) return "Emergency Relation must contain letters and spaces only.";
 
     return null;
   };
 
   const canSubmit = useMemo(() => {
     try { return !validate(); } catch { return false; }
-  }, [form, famLockSurname, birthdateYears, bpError]);
+  }, [form, famLockSurname, birthdateYears, bpError, heightErr, weightErr, tempErr, uiContact10, uiEmergency10]);
 
   const handleSubmitClick = async (e) => {
     e.preventDefault();
@@ -186,9 +264,7 @@ function PatientRegistration({ onDone, showHeader = true }) {
       if (!okMiddle) return;
     }
 
-    const ok = window.confirm(
-      "Finalize this registration? Make sure all required fields are complete. Click OK to submit or Cancel to review."
-    );
+    const ok = window.confirm("Finalize this registration? Make sure all required fields are complete. Click OK to submit or Cancel to review.");
     if (!ok) return;
 
     await submit();
@@ -209,23 +285,24 @@ function PatientRegistration({ onDone, showHeader = true }) {
 
       const sexForDb =
         form.sex === "MALE" ? "MEN" :
-          form.sex === "FEMALE" ? "WOMEN" :
-            form.sex;
+        form.sex === "FEMALE" ? "WOMEN" : form.sex;
+
+      // map +63 UI (10 digits) -> local 11 with leading 0
+      const cn = uiContact10 ? validatePhone10(uiContact10) : { local11: null };
+      const em = validatePhone10(uiEmergency10); // required
 
       const payload = {
-        family_number: sv(form.familyNumber),
+        family_number: padFam(sv(form.familyNumber), 3), // store as padded 3 digits
         surname: sv(form.surname),
         first_name: sv(form.firstName),
         middle_name: sv(form.middleName) || null,
         sex: sexForDb,
         birthdate: form.birthdate || null,
         age: form.age ? Number(form.age) : null,
-        contact_number: sv(form.contactNumber) || null,
 
-        // Existing column preserved: this remains the NUMBER used in emergency section
-        contact_person: sv(form.contactPerson) || null,
+        contact_number: cn.local11 || null,          // "09xxxxxxxxx"
+        contact_person: em.local11 || null,          // (existing emergency number column)
 
-        // NEW columns
         emergency_contact_name: sv(form.emergencyPersonName) || null,
         emergency_relation: sv(form.emergencyRelation) || null,
 
@@ -247,7 +324,7 @@ function PatientRegistration({ onDone, showHeader = true }) {
 
       if (error) throw error;
 
-      // Create a queued record if requested, snapshot emergency fields
+      // Create queued record if requested (kept)
       if (form.proceedToQueue && data?.id) {
         const { data: existing, error: existErr } = await supabase
           .from("patient_records")
@@ -255,7 +332,6 @@ function PatientRegistration({ onDone, showHeader = true }) {
           .eq("patient_id", data.id)
           .eq("status", "queued")
           .maybeSingle();
-
         if (existErr) throw existErr;
 
         if (!existing) {
@@ -268,18 +344,14 @@ function PatientRegistration({ onDone, showHeader = true }) {
               blood_pressure: payload.blood_pressure,
               temperature_c: payload.temperature_c,
               chief_complaint: payload.chief_complaint,
-
-              // NEW: emergency contact snapshot
               emergency_contact_name: payload.emergency_contact_name || null,
               emergency_relation: payload.emergency_relation || null,
               emergency_contact_number: payload.contact_person || null,
-
               queued: true,
               status: "queued",
               created_by: uid || null,
               queued_at: new Date().toISOString()
             });
-
           if (recErr) throw recErr;
         }
       }
@@ -287,13 +359,12 @@ function PatientRegistration({ onDone, showHeader = true }) {
       setNote({ type: "success", msg: "Patient saved successfully." });
       clearForm();
       setFamLockSurname(null);
+      setUiContact10("");
+      setUiEmergency10("");
       if (typeof onDone === "function") onDone();
     } catch (err) {
       console.error("submit error", {
-        code: err?.code,
-        message: err?.message,
-        details: err?.details,
-        hint: err?.hint,
+        code: err?.code, message: err?.message, details: err?.details, hint: err?.hint,
       });
       setNote({ type: "error", msg: err?.message || "Insert failed." });
     } finally {
@@ -301,7 +372,7 @@ function PatientRegistration({ onDone, showHeader = true }) {
     }
   };
 
-  // Auto-age from birthdate
+  // Auto-age from birthdate (kept)
   useEffect(() => {
     if (!form.birthdate) return;
     const b = new Date(form.birthdate);
@@ -314,11 +385,10 @@ function PatientRegistration({ onDone, showHeader = true }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.birthdate]);
 
-  // Family number -> surname lock
+  // Family number -> surname lock (kept)
   useEffect(() => {
     const fn = sv(form.familyNumber);
     if (!fn) { setFamLockSurname(null); return; }
-
     const t = setTimeout(async () => {
       try {
         setFamLookupLoading(true);
@@ -327,9 +397,7 @@ function PatientRegistration({ onDone, showHeader = true }) {
           .select("family_number,surname")
           .eq("family_number", fn)
           .limit(1);
-
         if (error) throw error;
-
         const hit = Array.isArray(data) && data[0] ? data[0] : null;
         if (hit?.surname) {
           const canonical = String(hit.surname).trim();
@@ -346,23 +414,22 @@ function PatientRegistration({ onDone, showHeader = true }) {
         setFamLookupLoading(false);
       }
     }, 350);
-
     return () => clearTimeout(t);
-  }, [form.familyNumber]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.familyNumber]);
 
+  /* -------------------- RENDER -------------------- */
   return (
     <section
       className="section section--registration"
-      style={showHeader ? undefined : { margin: 0 }} // remove extra outer margin in modal
+      style={showHeader ? undefined : { margin: 0 }}
     >
       {showHeader && <h2 className="section-title">Patient Registration</h2>}
 
       <form
         onSubmit={handleSubmitClick}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && e.target && e.target.tagName !== "TEXTAREA") {
-            e.preventDefault();
-          }
+          if (e.key === "Enter" && e.target && e.target.tagName !== "TEXTAREA") e.preventDefault();
         }}
         className="form form--patient-registration"
         autoComplete="off"
@@ -378,7 +445,7 @@ function PatientRegistration({ onDone, showHeader = true }) {
               <Field
                 label="Family Number"
                 value={form.familyNumber}
-                setValue={(v) => set("familyNumber", v)}
+                setValue={(v) => set("familyNumber", onlyDigits(v).slice(0,3))}  // NEW: hard digits clamp
                 required
                 hideAsterisk
                 error={familyNumberError}
@@ -442,6 +509,7 @@ function PatientRegistration({ onDone, showHeader = true }) {
               />
             </Row>
 
+            {/* Age + Patient Contact Number (+63) */}
             <Row two>
               <Field
                 label="Age"
@@ -454,23 +522,26 @@ function PatientRegistration({ onDone, showHeader = true }) {
                 max={120}
                 error={ageError}
               />
-              <Field
-                label="Contact Number"
-                value={form.contactNumber}
-                setValue={(v) => set("contactNumber", v)}
-                digitsOnly
-                digitsOnlyExact={11}
+              <PhoneField
+                label="Contact Number (+63)"
+                value10={uiContact10}
+                setValue10={(v)=>{
+                  const only = onlyDigits(v).slice(0,10);
+                  setUiContact10(only);
+                  const { error } = validatePhone10(only);
+                  setContactErr(error || "");
+                }}
+                error={contactErr}
+                // keep a hidden mirror for persistence so your local storage still has it
+                mirrorTo={(local11) => set("contactNumber", local11 || "")}
               />
             </Row>
 
-            {isInfant && (
-              <div className="note note--info note--compact">
-                Age based on birthdate: {infantMonths} month{infantMonths === 1 ? "" : "s"}
-              </div>
-            )}
-
+            {/* In case of Emergency */}
             <div className="subsection">
               <div className="subsection__title">In case of Emergency</div>
+
+              {/* Contact Person name + Emergency Contact Number (+63) side by side */}
               <Row two>
                 <Field
                   label="Contact Person"
@@ -480,6 +551,23 @@ function PatientRegistration({ onDone, showHeader = true }) {
                   hideAsterisk
                   error={emergencyNameError}
                 />
+                <PhoneField
+                  label="Emergency Contact Number (+63)"
+                  value10={uiEmergency10}
+                  setValue10={(v)=>{
+                    const only = onlyDigits(v).slice(0,10);
+                    setUiEmergency10(only);
+                    const { error } = validatePhone10(only);
+                    setEmergencyNumErr(error || "");
+                  }}
+                  error={emergencyNumErr}
+                  required
+                  mirrorTo={(local11) => set("contactPerson", local11 || "")} // keeps your existing key
+                />
+              </Row>
+
+              {/* Relation on the next row */}
+              <Row two>
                 <Field
                   label="Relation"
                   value={form.emergencyRelation}
@@ -488,16 +576,8 @@ function PatientRegistration({ onDone, showHeader = true }) {
                   hideAsterisk
                   error={emergencyRelationError}
                 />
+                <div />
               </Row>
-              <Field
-                label="Contact Number"
-                value={form.contactPerson}          // existing key, kept (NUMBER)
-                setValue={(v) => set("contactPerson", v)}
-                digitsOnly
-                digitsOnlyExact={11}
-                required
-                hideAsterisk
-              />
             </div>
           </div>
         </div>
@@ -515,6 +595,7 @@ function PatientRegistration({ onDone, showHeader = true }) {
                 setValue={(v) => set("heightCm", v)}
                 oneDecimal
                 placeholder="e.g. 170.0"
+                error={heightErr}
               />
               <Field
                 label="Weight"
@@ -522,6 +603,7 @@ function PatientRegistration({ onDone, showHeader = true }) {
                 setValue={(v) => set("weightKg", v)}
                 oneDecimal
                 placeholder="e.g. 59.0"
+                error={weightErr}
               />
               <Field
                 label="Blood Pressure"
@@ -536,6 +618,7 @@ function PatientRegistration({ onDone, showHeader = true }) {
                 setValue={(v) => set("temperatureC", v)}
                 oneDecimal
                 placeholder="e.g. 36.8"
+                error={tempErr}
               />
             </div>
 
@@ -616,8 +699,6 @@ function Field({
   error = "",
   hideAsterisk = false,
 }) {
-  const onlyDigits = (s) => s.replace(/\D+/g, "");
-
   const handleChange = (e) => {
     let raw = e.target.value;
 
@@ -636,9 +717,7 @@ function Field({
 
     if (digitsOnly) {
       raw = onlyDigits(raw);
-      if (typeof digitsOnlyExact === "number") {
-        raw = raw.slice(0, digitsOnlyExact);
-      }
+      if (typeof digitsOnlyExact === "number") raw = raw.slice(0, digitsOnlyExact);
       setValue(raw);
       return;
     }
@@ -710,6 +789,45 @@ function Select({ label, value, onChange, options, required = false, hideAsteris
         </select>
         <span className="select-caret">v</span>
       </div>
+    </div>
+  );
+}
+
+/* ---------- NEW: +63 Phone Field (10-digit UI, mirrors 11-digit local for persistence) ---------- */
+function PhoneField({ label, value10, setValue10, error, required = false, mirrorTo }) {
+  // Whenever UI value changes, mirror 11-digit local back up so your persisted form stays coherent.
+  useEffect(() => {
+    const { error: e, local11 } = validatePhone10(value10);
+    if (mirrorTo) mirrorTo(e ? "" : local11);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value10]);
+
+  const hasError = !!error;
+
+  return (
+    <div className="field">
+      <label className="label">
+        {label}{required && <span className="required-asterisk"> *</span>}:
+      </label>
+      <div className="phone-field">
+        <span className="phone-prefix">+63</span>
+        <input
+          className={`input phone-input ${hasError ? "has-error" : ""}`}
+          value={value10}
+          onChange={(e)=> setValue10(e.target.value)}
+          inputMode="numeric"
+          placeholder="9123456789"
+          maxLength={10}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          required={required}
+          aria-invalid={hasError ? "true" : "false"}
+          title="Must be 10 digits after +63"
+        />
+      </div>
+      {hasError && <div className="error-text">{error}</div>}
     </div>
   );
 }

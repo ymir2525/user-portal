@@ -3,13 +3,12 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { dateOnly } from "../lib/utils";
 import { supabase } from "../lib/supabase";
-import "./BhwFamily.css";
 
 export default function BhwFamily() {
   const { familyNumber } = useParams();
   const nav = useNavigate();
 
-  const [mode, setMode] = useState("members"); // "members" | "patient" | "new"
+  const [mode, setMode] = useState("members"); // "members" | "patient"
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -24,7 +23,7 @@ export default function BhwFamily() {
   const [records, setRecords] = useState([]);
 
   // past-record subviews
-  const [pastView, setPastView] = useState("list"); // 'list' | 'detail' | 'chart' | 'docs'
+  const [pastView, setPastView] = useState("list"); // 'list' | 'combined'
   const [selectedPast, setSelectedPast] = useState(null);
 
   // Helper: Manila "today" (YYYY-MM-DD)
@@ -41,32 +40,32 @@ export default function BhwFamily() {
     return `${y}-${m}-${d}`;
   };
 
-  // --- New-record form state (now includes emergency contact fields) ---
+  // New-record form state
   const [form, setForm] = useState({
     heightCm: "", weightKg: "", bloodPressure: "", temperatureC: "",
     chiefComplaint: "",
-    // NEW (snapshot for this record):
     emergencyName: "",
     emergencyRelation: "",
     emergencyNumber: "",
-    proceedToQueue: true // QUEUE BY DEFAULT
+    proceedToQueue: true
   });
 
-  // === validation (original + emergency fields) ===
+  // === validation (same rules, rewritten as a function) ===
   const validate = useCallback((f) => {
     const errs = {};
     const trimmedCC = (f.chiefComplaint || "").trim();
 
-    // Required vitals
+    // helpers
+    const toNum = (v) => (v === "" || v == null ? null : Number(v));
+    const onlyDigits = (s) => (s || "").replace(/\D/g, "");
+    const lettersOnlyBad = (s) => /[^A-Za-z\s]/.test(s || "");
+
+    // required vitals
     if (!f.heightCm) errs.heightCm = "Required.";
     if (!f.weightKg) errs.weightKg = "Required.";
     if (!f.bloodPressure) errs.bloodPressure = "Required.";
     if (!f.temperatureC) errs.temperatureC = "Required.";
     if (!trimmedCC) errs.chiefComplaint = "Required.";
-
-    const toNum = (v) => (v === "" || v == null ? null : Number(v));
-    const onlyDigits = (s) => (s || "").replace(/\D/g, "");
-    const lettersOnlyBad = (s) => /[^A-Za-z\s]/.test(s || "");
 
     // Height: up to 5 digits total; 1 decimal
     if (f.heightCm) {
@@ -75,11 +74,11 @@ export default function BhwFamily() {
       const hasOneDot = (hTxt.match(/\./g) || []).length <= 1;
       const decOk = /^\d+(\.\d)?$/.test(hTxt) || /^\d+\.$/.test(hTxt);
       if (hDigits.length === 0 || hDigits.length > 5 || !hasOneDot || !decOk) {
-        errs.heightCm = "Height must be up to 5 digits, optional 1 decimal (e.g., 163.6).";
+        errs.heightCm = "Up to 5 digits, 1 decimal (e.g., 163.6).";
       }
       const h = toNum(hTxt.endsWith(".") ? hTxt.slice(0, -1) : hTxt);
       if (h == null || isNaN(h)) errs.heightCm = errs.heightCm || "Invalid number.";
-      else if (h < 30 || h > 300) errs.heightCm = "Height must be 30–300 cm.";
+      else if (h < 30 || h > 300) errs.heightCm = "30–300 cm.";
     }
 
     // Weight: up to 4 digits total; up to 2 decimals
@@ -89,11 +88,11 @@ export default function BhwFamily() {
       const hasOneDot = (wTxt.match(/\./g) || []).length <= 1;
       const decOk = /^\d+(\.\d{0,2})?$/.test(wTxt) || /^\d+\.$/.test(wTxt);
       if (wDigits.length === 0 || wDigits.length > 4 || !hasOneDot || !decOk) {
-        errs.weightKg = "Weight must be up to 4 digits total; up to 2 decimals (e.g., 53.7 or 53.72).";
+        errs.weightKg = "Up to 4 digits; up to 2 decimals (e.g., 53.72).";
       }
       const w = toNum(wTxt.endsWith(".") ? wTxt.slice(0, -1) : wTxt);
       if (w == null || isNaN(w)) errs.weightKg = errs.weightKg || "Invalid number.";
-      else if (w <= 0 || w > 500) errs.weightKg = "Weight must be 1–500 kg.";
+      else if (w <= 0 || w > 500) errs.weightKg = "1–500 kg.";
     }
 
     // Blood pressure
@@ -101,56 +100,51 @@ export default function BhwFamily() {
       const bp = String(f.bloodPressure).trim();
       const m = bp.match(/^(\d{1,4})\/(\d{1,4})$/);
       if (!m) {
-        errs.bloodPressure = "BP must look like 120/80.";
+        errs.bloodPressure = "Use 120/80 format.";
       } else {
         const left = m[1], right = m[2];
         if (left.length >= 4 || right.length >= 4) {
-          errs.bloodPressure = "4 digits in blood pressure is not possible. Please make sure you input the correct BP.";
+          errs.bloodPressure = "4 digits is invalid for BP.";
         } else {
           const sys = Number(left), dia = Number(right);
-          if (isNaN(sys) || isNaN(dia)) {
-            errs.bloodPressure = "BP must be numbers like 120/80.";
-          } else if (sys < dia) {
-            errs.bloodPressure = "Systolic should be ≥ diastolic.";
-          }
+          if (isNaN(sys) || isNaN(dia)) errs.bloodPressure = "Numbers only.";
+          else if (sys < dia) errs.bloodPressure = "Systolic ≥ diastolic.";
           if (!errs.bloodPressure && (sys < 70 || sys > 260 || dia < 40 || dia > 160)) {
-            errs.bloodPressure = "BP values look out of range.";
+            errs.bloodPressure = "Out of range.";
           }
         }
       }
     }
 
-    // Temperature: up to 4 digits total; up to 2 decimals
+    // Temperature
     if (f.temperatureC) {
       const tTxt = String(f.temperatureC);
-      const tDigits = onlyDigits(tTxt);
+      const tDigits = (tTxt || "").replace(/\D/g, "");
       const hasOneDot = (tTxt.match(/\./g) || []).length <= 1;
       const decOk = /^\d+(\.\d{0,2})?$/.test(tTxt) || /^\d+\.$/.test(tTxt);
       if (tDigits.length === 0 || tDigits.length > 4 || !hasOneDot || !decOk) {
-        errs.temperatureC = "Temperature must be up to 4 digits total; up to 2 decimals (e.g., 43.7 or 43.68).";
+        errs.temperatureC = "Up to 4 digits; up to 2 decimals.";
       }
       const t = Number(tTxt.endsWith(".") ? tTxt.slice(0, -1) : tTxt);
       if (t == null || isNaN(t)) errs.temperatureC = errs.temperatureC || "Invalid number.";
-      else if (t < 30 || t > 45) errs.temperatureC = "Temperature must be 30–45 °C.";
+      else if (t < 30 || t > 45) errs.temperatureC = "30–45 °C.";
     }
 
-    if (trimmedCC.length > 1000) errs.chiefComplaint = "Keep under 1000 characters.";
+    if (trimmedCC.length > 1000) errs.chiefComplaint = "Max 1000 chars.";
 
-    // --- NEW: Emergency contact required + masks (match Dashboard) ---
+    // Emergency contact
     if (!f.emergencyName || !f.emergencyName.trim()) {
       errs.emergencyName = "Required.";
     } else if (lettersOnlyBad(f.emergencyName)) {
-      errs.emergencyName = "Letters and spaces only.";
+      errs.emergencyName = "Letters/spaces only.";
     }
     if (!f.emergencyRelation || !f.emergencyRelation.trim()) {
       errs.emergencyRelation = "Required.";
     } else if (lettersOnlyBad(f.emergencyRelation)) {
-      errs.emergencyRelation = "Letters and spaces only.";
+      errs.emergencyRelation = "Letters/spaces only.";
     }
-    const num = onlyDigits(f.emergencyNumber);
-    if (!num || num.length !== 11) {
-      errs.emergencyNumber = "Must be exactly 11 digits.";
-    }
+    const num = (f.emergencyNumber || "").replace(/\D/g, "");
+    if (!num || num.length !== 11) errs.emergencyNumber = "Exactly 11 digits.";
 
     if (Object.keys(errs).length) errs._form = "Please fix the highlighted fields.";
     return errs;
@@ -231,6 +225,15 @@ export default function BhwFamily() {
       setMode("patient");
       setPastView("list");
       setSelectedPast(null);
+
+      // Prefill emergency snapshot for modal
+      setForm((prev) => ({
+        ...prev,
+        emergencyName: p.emergency_contact_name || "",
+        emergencyRelation: p.emergency_relation || "",
+        emergencyNumber: p.contact_person || "",
+      }));
+      setErrors({});
     } catch (e) {
       console.error(e);
       setErr(e.message || "Failed to load patient");
@@ -239,7 +242,7 @@ export default function BhwFamily() {
     }
   };
 
-  // New record submit
+  // Submit new record
   const [saving, setSaving] = useState(false);
   const submitNewRecord = async (e) => {
     e.preventDefault();
@@ -255,36 +258,30 @@ export default function BhwFamily() {
     try {
       setSaving(true);
 
-      // who is inserting (for RLS visibility)?
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess?.session?.user?.id || null;
 
       const num = (v) => (v === "" || v == null ? null : Number(v));
       const trim = (s) => (s || "").trim();
       const onlyDigits = (s) => (s || "").replace(/\D/g, "");
-      const willQueue = !!form.proceedToQueue;
 
       const payload = {
         patient_id: patient.id,
 
-        // vitals
         height_cm: num(form.heightCm.endsWith(".") ? form.heightCm.slice(0, -1) : form.heightCm),
         weight_kg: num(form.weightKg.endsWith(".") ? form.weightKg.slice(0, -1) : form.weightKg),
         blood_pressure: trim(form.bloodPressure) || null,
         temperature_c: num(form.temperatureC.endsWith(".") ? form.temperatureC.slice(0, -1) : form.temperatureC),
         chief_complaint: trim(form.chiefComplaint) || null,
 
-        // snapshot emergency contact (NEW)
         emergency_contact_name: trim(form.emergencyName) || null,
         emergency_relation: trim(form.emergencyRelation) || null,
         emergency_contact_number: onlyDigits(form.emergencyNumber) || null,
 
-        // queue flags
         visit_date: manilaTodayDate(),
         queued: true,
         status: "queued",
         queued_at: new Date().toISOString(),
-
         created_by: uid,
       };
 
@@ -296,15 +293,15 @@ export default function BhwFamily() {
 
       if (error) throw error;
 
-      // also flag the PATIENT as queued now
-      if (willQueue) {
+      // flag the patient as queued
+      if (form.proceedToQueue) {
         await supabase
           .from("patients")
           .update({ queued: true, queued_at: new Date().toISOString() })
           .eq("id", patient.id);
       }
 
-      // reload patient’s records
+      // reload past records
       const { data: recs } = await supabase
         .from("patient_records")
         .select("*")
@@ -313,18 +310,9 @@ export default function BhwFamily() {
 
       setRecords(Array.isArray(recs) ? recs : []);
 
-      // reset form
-      setForm({
-        heightCm: "", weightKg: "", bloodPressure: "", temperatureC: "",
-        chiefComplaint: "",
-        emergencyName: patient?.emergency_contact_name || "",
-        emergencyRelation: patient?.emergency_relation || "",
-        emergencyNumber: patient?.contact_person || "",
-        proceedToQueue: true
-      });
+      // reset modal + errors
+      setIsModalOpen(false);
       setErrors({});
-      setMode("patient");
-      setPastView("list");
     } catch (e) {
       alert(e.message || "Save failed");
     } finally {
@@ -345,350 +333,216 @@ export default function BhwFamily() {
     return age;
   }, [patient]);
 
-  // Prefill emergency fields when switching to "new"
-  useEffect(() => {
-    if (mode === "new" && patient) {
-      setForm((prev) => ({
-        ...prev,
-        emergencyName: patient.emergency_contact_name || "",
-        emergencyRelation: patient.emergency_relation || "",
-        emergencyNumber: patient.contact_person || "",
-      }));
-      setErrors({});
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, patient?.id]);
+  // modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
-    <div className="family-page">
-      {/* top bar: back and logout */}
-      <div className="topbar">
-        <Link to="/bhw" className="link link--small">← Back to Records</Link>
-        <button onClick={logout} className="link link--small">Log Out</button>
+    <div className="min-h-screen bg-white text-slate-900">
+      {/* top bar */}
+      <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between border-b border-slate-200">
+        <Link to="/bhw" className="text-indigo-700 hover:text-indigo-900 text-sm font-medium">
+          ← Back to Records
+        </Link>
+        <h2 className="text-teal-700 font-semibold">Family: {familyNumber}</h2>
+        <button onClick={async()=>{ await supabase.auth.signOut().catch(()=>{}); nav("/login", { replace: true }); }} className="text-sm text-slate-600 hover:text-slate-900">
+          Log Out
+        </button>
       </div>
 
-      <h2 className="page-title page-title--family">Family: {familyNumber}</h2>
+      {/* page body */}
+      <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto">
+        {loading && <div className="text-center text-sm text-slate-700">Loading…</div>}
+        {err && <div className="text-center text-sm text-red-600">{err}</div>}
 
-      {loading && <div className="status status--loading">Loading…</div>}
-      {err && <div className="error-text text-center">{err}</div>}
-
-      {!loading && !err && (
-        <>
-          {mode === "members" && (
-            <div className="member-list">
-              {members.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => openPatient(m.id)}
-                  className="member-card"
-                >
-                  <div className="member-card__row">
-                    <div className="member-card__main">
-                      <span className="member-card__name">
-                        {m.first_name} {m.middle_name ? `${m.middle_name} ` : ""}{m.surname}
-                      </span>
-                      <span className="member-card__meta">
-                        {" "}• {m.sex} • {m.age} Years Old
-                      </span>
+        {!loading && !err && (
+          <>
+            {mode === "members" && (
+              <div className="flex flex-col gap-3 items-center">
+                {members.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => openPatient(m.id)}
+                    className="w-full max-w-2xl rounded-lg border border-slate-300 bg-white px-4 py-3 text-left hover:bg-slate-50 transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold truncate">
+                          {m.first_name} {m.middle_name ? `${m.middle_name} ` : ""}{m.surname}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          • {m.sex} • {m.age} Years Old
+                        </div>
+                      </div>
+                      <div className="text-xs text-slate-600">{dateOnly(m.birthdate)}</div>
                     </div>
-                    <div className="member-card__date">{dateOnly(m.birthdate)}</div>
+                  </button>
+                ))}
+
+                {members.length === 0 && (
+                  <div className="text-center text-sm text-slate-500 mt-3">No members found.</div>
+                )}
+              </div>
+            )}
+
+            {mode === "patient" && patient && (
+              <div className="max-w-5xl mx-auto">
+                {/* header with + New Record */}
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                  <div className="text-lg font-semibold">
+                    {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
                   </div>
-                </button>
-              ))}
-
-              {members.length === 0 && (
-                <div className="empty">No members found.</div>
-              )}
-            </div>
-          )}
-
-          {mode === "patient" && patient && (
-            <div className="patient-wrap">
-              {/* header with + New Record */}
-              <div className="patient-head">
-                <div className="patient-name">
-                  {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="inline-flex items-center rounded-lg border border-teal-600 text-teal-700 px-3 py-2 text-sm font-semibold hover:bg-teal-50"
+                  >
+                    + New Record
+                  </button>
                 </div>
-                <button
-                  onClick={() => { setMode("new"); setErrors({}); setErr(""); }}
-                  className="btn btn--accent"
-                >
-                  + New Record
-                </button>
-              </div>
 
-              {/* Meta summary (now shows emergency details like screenshot) */}
-              <div className="patient-meta">
-                <div><strong>Birthdate:</strong> {dateOnly(patient.birthdate) || "—"}</div>
-                <div><strong>Age:</strong> {computedAge || "—"} yrs old</div>
-                <div><strong>Sex:</strong> {patient.sex || "—"}</div>
-                <div><strong>Contact Number:</strong> {patient.contact_number || "—"}</div>
-                <div className="patient-emergency">
-                  <strong>Contact Person:</strong> {patient.emergency_contact_name || "—"}
-                  {" "} | <strong>Contact Number:</strong> {patient.contact_person || "—"}
-                  {" "} | <strong>Relation:</strong> {patient.emergency_relation || "—"}
+                {/* meta */}
+                <div className="grid sm:grid-cols-3 gap-3 mb-4 text-sm">
+                  <div><span className="font-semibold">Birthdate:</span> {dateOnly(patient.birthdate) || "—"}</div>
+                  <div><span className="font-semibold">Age:</span> {computedAge || "—"} yrs old</div>
+                  <div><span className="font-semibold">Sex:</span> {patient.sex || "—"}</div>
+                  <div><span className="font-semibold">Contact Number:</span> {patient.contact_number || "—"}</div>
+                  <div className="sm:col-span-2">
+                    <span className="font-semibold">Contact Person:</span> {patient.emergency_contact_name || "—"}
+                    {" "} | <span className="font-semibold">Contact Number:</span> {patient.contact_person || "—"}
+                    {" "} | <span className="font-semibold">Relation:</span> {patient.emergency_relation || "—"}
+                  </div>
+                  <div className="justify-self-end font-semibold">Fam {patient.family_number || "—"}</div>
                 </div>
-                <div className="patient-right">
-                  <strong>Fam {patient.family_number || "—"}</strong>
-                </div>
-              </div>
 
-              {/* Past Records */}
-              {pastView === "list" && (
-                <>
-                  <div className="subhead">Past Records</div>
-                  <div className="record-list">
-                    {records.length === 0 && (
-                      <div className="empty">No past records found.</div>
-                    )}
-                    {records.map(r => (
+                {/* Past Records */}
+                {pastView === "list" && (
+                  <>
+                    <div className="text-sm font-semibold mb-2">Past Records</div>
+                    <div className="flex flex-col gap-2">
+                      {records.length === 0 && (
+                        <div className="text-sm text-slate-500">No past records found.</div>
+                      )}
+                      {records.map(r => (
+                        <button
+                          key={r.id}
+                          onClick={() => { setSelectedPast(r); setPastView("combined"); }}
+                          className="w-full text-left rounded-lg border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50"
+                        >
+                          <div className="font-bold text-base">
+                            {dateOnly(r.completed_at || r.visit_date || r.created_at)}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5">
+                            H: {r.height_cm ?? "—"} cm • W: {r.weight_kg ?? "—"} kg • BP: {r.blood_pressure ?? "—"} •
+                            Temp: {r.temperature_c ?? "—"} °C • CC: {r.chief_complaint || "—"}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-4">
                       <button
-                        key={r.id}
-                        onClick={() => { setSelectedPast(r); setPastView("detail"); }}
-                        className="record-item"
+                        onClick={() => setMode("members")}
+                        className="inline-flex items-center rounded-md bg-teal-600 text-white px-4 py-2 text-sm font-semibold hover:bg-teal-700"
                       >
-                        <div className="record-item__title">
-                          {dateOnly(r.completed_at || r.visit_date || r.created_at)}
-                        </div>
-                        <div className="record-item__meta">
-                          H: {r.height_cm ?? "—"} cm • W: {r.weight_kg ?? "—"} kg • BP: {r.blood_pressure ?? "—"} •
-                          Temp: {r.temperature_c ?? "—"} °C • CC: {r.chief_complaint || "—"}
-                        </div>
+                        Back
                       </button>
-                    ))}
-                  </div>
-
-                  <div className="actions actions--back">
-                    <button
-                      onClick={() => setMode("members")}
-                      className="btn btn--primary"
-                    >
-                      Back
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {pastView === "detail" && selectedPast && (
-                <PastDetail
-                  rec={selectedPast}
-                  patient={patient}
-                  onBack={() => { setPastView("list"); setSelectedPast(null); }}
-                  onViewChart={() => setPastView("chart")}
-                  onViewDocs={() => setPastView("docs")}
-                />
-              )}
-
-              {pastView === "chart" && selectedPast && (
-                <PastChartViewLite
-                  rec={selectedPast}
-                  patient={patient}
-                  onBack={() => setPastView("detail")}
-                />
-              )}
-
-              {pastView === "docs" && selectedPast && (
-                <PastDocumentsViewLite
-                  rec={selectedPast}
-                  onBack={() => setPastView("detail")}
-                />
-              )}
-            </div>
-          )}
-
-          {mode === "new" && patient && (
-            <div className="new-record">
-              <h3 className="page-title page-title--sub">
-                New Record for {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
-              </h3>
-
-              <form onSubmit={submitNewRecord} className="form form--new-record">
-                {/* ===== Card: Patient Record (summary + emergency fields) ===== */}
-                <div className="card">
-                  <div className="card__title">Patient Record</div>
-                  <div className="row row--two">
-                    <div className="field">
-                      <label className="label">Patient Name:</label>
-                      <input
-                        className="input input--readonly"
-                        readOnly
-                        value={`${patient.first_name} ${patient.middle_name ? patient.middle_name + " " : ""}${patient.surname}`}
-                      />
                     </div>
-                    <div className="field">
-                      <label className="label">Family Number:</label>
-                      <input
-                        className="input input--readonly"
-                        readOnly
-                        value={patient.family_number || ""}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="row row--two">
-                    <div className="field">
-                      <label className="label">Age:</label>
-                      <input
-                        className="input input--readonly"
-                        readOnly
-                        value={computedAge || ""}
-                      />
-                    </div>
-                    <div className="field">
-                      <label className="label">Birthdate:</label>
-                      <input
-                        className="input input--readonly"
-                        readOnly
-                        value={dateOnly(patient.birthdate) || ""}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="subsection">
-                    <div className="subsection__title">In case of Emergency</div>
-                    <div className="row row--two">
-                      <TextField
-                        label="Contact Person"
-                        value={form.emergencyName}
-                        onChange={(v)=>setField("emergencyName", v)}
-                        placeholder="Enter full name"
-                        error={errors.emergencyName}
-                      />
-                      <TextField
-                        label="Relation"
-                        value={form.emergencyRelation}
-                        onChange={(v)=>setField("emergencyRelation", v)}
-                        placeholder="e.g., Wife"
-                        error={errors.emergencyRelation}
-                      />
-                    </div>
-                    <DigitsField
-                      label="Contact Number"
-                      value={form.emergencyNumber}
-                      onChange={(v)=>setField("emergencyNumber", v)}
-                      exactLen={11}
-                      placeholder="09123456789"
-                      error={errors.emergencyNumber}
-                    />
-                  </div>
-                </div>
-
-                {/* ===== Card: Nurse’s Notes (stacked like screenshot) ===== */}
-                <div className="card">
-                  <div className="card__title">Nurse’s Notes</div>
-
-                  <div className="stack">
-                    <Field label="Height (cm)" value={form.heightCm} onChange={v => setField("heightCm", v)} mode="height" placeholder="e.g. 163.6" error={errors.heightCm} />
-                    <Field label="Weight (kg)" value={form.weightKg} onChange={v => setField("weightKg", v)} mode="weight" placeholder="e.g. 53.72" error={errors.weightKg} />
-                    <Field label="Blood Pressure" value={form.bloodPressure} onChange={v => setField("bloodPressure", v)} mode="bp" placeholder="e.g. 120/80" error={errors.bloodPressure} />
-                    <Field label="Temperature (°C)" value={form.temperatureC} onChange={v => setField("temperatureC", v)} mode="temp" placeholder="e.g. 36.8" error={errors.temperatureC} />
-                  </div>
-
-                  <div className="field">
-                    <label className="label">Chief Complaint:</label>
-                    <textarea
-                      className={`textarea ${errors.chiefComplaint ? 'has-error' : ''}`}
-                      value={form.chiefComplaint}
-                      onChange={e => setField("chiefComplaint", e.target.value)}
-                    />
-                    {errors.chiefComplaint && (
-                      <div className="error-text">{errors.chiefComplaint}</div>
-                    )}
-                  </div>
-                </div>
-
-                <label className="checkbox">
-                  <input
-                    type="checkbox"
-                    className="checkbox-input"
-                    checked={form.proceedToQueue}
-                    onChange={e => setField("proceedToQueue", e.target.checked)}
-                  />
-                  <span className="checkbox-label">Proceed to Queuing</span>
-                </label>
-
-                {errors._form && (
-                  <div className="error-text">{errors._form}</div>
+                  </>
                 )}
 
-                {/* STICKY submit bar */}
-                <div className="actions actions--sticky">
-                  <button
-                    onClick={() => setMode("patient")}
-                    type="button"
-                    className="btn btn--secondary"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving || !canSubmit}
-                    className="btn btn--primary btn--full"
-                  >
-                    {saving ? "Saving..." : "Submit"}
-                  </button>
-                </div>
-              </form>
+                {pastView === "combined" && selectedPast && (
+                  <PastCombinedView
+                    rec={selectedPast}
+                    patient={patient}
+                    onBack={() => { setPastView("list"); setSelectedPast(null); }}
+                  />
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* NEW RECORD MODAL */}
+      {isModalOpen && (
+        <Modal onClose={() => setIsModalOpen(false)} title={`New Record — ${patient?.first_name ?? ""} ${patient?.middle_name ? patient.middle_name + " " : ""}${patient?.surname ?? ""}`}>
+          <form onSubmit={submitNewRecord} className="space-y-5">
+            {/* Patient summary */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <ReadOnly label="Patient Name" value={`${patient.first_name} ${patient.middle_name ? patient.middle_name + " " : ""}${patient.surname}`} />
+              <ReadOnly label="Family Number" value={patient.family_number || ""} />
+              <ReadOnly label="Age" value={computedAge || ""} />
+              <ReadOnly label="Birthdate" value={dateOnly(patient.birthdate) || ""} />
             </div>
-          )}
-        </>
+
+            {/* Emergency */}
+            <div>
+              <div className="text-sm font-semibold mb-2">In case of Emergency</div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <TextField label="Contact Person" value={form.emergencyName} onChange={(v)=>setField("emergencyName", v)} placeholder="Enter full name" error={errors.emergencyName}/>
+                <TextField label="Relation" value={form.emergencyRelation} onChange={(v)=>setField("emergencyRelation", v)} placeholder="e.g., Wife" error={errors.emergencyRelation}/>
+              </div>
+              <DigitsField label="Contact Number" value={form.emergencyNumber} onChange={(v)=>setField("emergencyNumber", v)} exactLen={11} placeholder="09123456789" error={errors.emergencyNumber}/>
+            </div>
+
+            {/* Nurse’s Notes */}
+            <div>
+              <div className="text-sm font-semibold mb-2">Nurse’s Notes</div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Height (cm)" value={form.heightCm} onChange={v => setField("heightCm", v)} mode="height" placeholder="e.g. 163.6" error={errors.heightCm}/>
+                <Field label="Weight (kg)" value={form.weightKg} onChange={v => setField("weightKg", v)} mode="weight" placeholder="e.g. 53.72" error={errors.weightKg}/>
+                <Field label="Blood Pressure" value={form.bloodPressure} onChange={v => setField("bloodPressure", v)} mode="bp" placeholder="e.g. 120/80" error={errors.bloodPressure}/>
+                <Field label="Temperature (°C)" value={form.temperatureC} onChange={v => setField("temperatureC", v)} mode="temp" placeholder="e.g. 36.8" error={errors.temperatureC}/>
+              </div>
+
+              <div className="mt-3">
+                <label className="block text-sm font-medium mb-1">Chief Complaint</label>
+                <textarea
+                  className={`w-full rounded-md border px-3 py-2 text-sm ${errors.chiefComplaint ? "border-red-400" : "border-slate-300"} focus:outline-none focus:ring-2 focus:ring-teal-500`}
+                  value={form.chiefComplaint}
+                  onChange={e => setField("chiefComplaint", e.target.value)}
+                  rows={4}
+                />
+                {errors.chiefComplaint && <p className="text-xs text-red-600 mt-1">{errors.chiefComplaint}</p>}
+              </div>
+            </div>
+
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                checked={form.proceedToQueue}
+                onChange={e => setField("proceedToQueue", e.target.checked)}
+              />
+              Proceed to Queuing
+            </label>
+
+            {errors._form && <div className="text-sm text-red-600">{errors._form}</div>}
+
+            <div className="sticky bottom-0 pt-3 border-t bg-white flex flex-col-reverse sm:flex-row gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="inline-flex items-center rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !canSubmit}
+                className="inline-flex items-center rounded-md bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:bg-teal-300"
+              >
+                {saving ? "Saving…" : "Submit"}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );
 }
 
-/* ---------- Small subviews for past record ---------- */
-
-function PastDetail({ rec, patient, onBack, onViewChart, onViewDocs }) {
-  return (
-    <div className="past past--detail">
-      <div className="past-head">
-        <h3 className="subhead">{dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
-        <button onClick={onBack} className="btn btn--light">Back</button>
-      </div>
-
-      <div className="past-meta">
-        <div><strong>Patient Name:</strong> {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}</div>
-        <div><strong>Doctor in Charge:</strong> {rec.doctor_full_name || "—"}</div>
-        <div><strong>Date:</strong> {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</div>
-      </div>
-
-      <div className="past-actions">
-        <button onClick={onViewChart} className="btn btn--accent-block">View Chart</button>
-        <button onClick={onViewDocs} className="btn btn--accent-block">View Documents</button>
-      </div>
-    </div>
-  );
-}
-
-function PastChartViewLite({ rec, patient, onBack }) {
-  return (
-    <div className="past past--chart">
-      <div className="past-head">
-        <h3 className="subhead">Chart – {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
-        <button onClick={onBack} className="btn btn--light">Back</button>
-      </div>
-
-      <div className="grid grid--two">
-        <div className="card">
-          <div className="card__title">Nurse Vitals</div>
-          <div>Height: {rec.height_cm ?? "—"} cm</div>
-          <div>Weight: {rec.weight_kg ?? "—"} kg</div>
-          <div>BP: {rec.blood_pressure ?? "—"}</div>
-          <div>Temperature: {rec.temperature_c ?? "—"} °C</div>
-          <div>Chief Complaint: {rec.chief_complaint || "—"}</div>
-        </div>
-        <div className="card">
-          <div className="card__title">Doctor’s Notes</div>
-          <div className="prewrap">{rec.doctor_notes || "—"}</div>
-          <div className="muted small">Doctor: {rec.doctor_full_name || "—"}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PastDocumentsViewLite({ rec, onBack }) {
+/* ---------- Past Combined View (Tailwind) ---------- */
+function PastCombinedView({ rec, patient, onBack }) {
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -703,7 +557,6 @@ function PastDocumentsViewLite({ rec, onBack }) {
           .select("*")
           .eq("record_id", rec.id)
           .order("created_at", { ascending: false });
-
         if (error) throw error;
         if (mounted) setDocs(Array.isArray(data) ? data : []);
       } catch (e) {
@@ -715,26 +568,76 @@ function PastDocumentsViewLite({ rec, onBack }) {
     return () => { mounted = false; };
   }, [rec.id]);
 
+  const printNow = () => window.print();
+
   return (
-    <div className="past past--docs">
-      <div className="past-head">
-        <h3 className="subhead">Document Request</h3>
-        <button onClick={onBack} className="btn btn--light">Back</button>
+    <div className="max-w-3xl mx-auto">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h3 className="text-base font-semibold">
+          Patient Record — {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}
+        </h3>
+        <div className="flex gap-2">
+          <button onClick={onBack} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Back</button>
+          <button onClick={printNow} className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-700">Download Chart</button>
+        </div>
       </div>
 
-      <div className="docs-panel">
-        {loading && <div className="status status--loading">Loading…</div>}
-        {err && <div className="error-text">{err}</div>}
+      {/* Patient header */}
+      <div className="mt-3 rounded-lg border border-slate-200 p-4">
+        <div className="font-semibold">
+          {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
+        </div>
+        <div className="text-xs text-slate-600 mt-1">
+          Birthdate: {dateOnly(patient.birthdate) || "—"} • Age: {(() => {
+            const bd = patient?.birthdate ? new Date(patient.birthdate) : null;
+            if (!bd || isNaN(bd)) return patient?.age ?? "—";
+            const t = new Date();
+            let a = t.getFullYear() - bd.getFullYear();
+            const m = t.getMonth() - bd.getMonth();
+            if (m < 0 || (m === 0 && t.getDate() < bd.getDate())) a--;
+            return a;
+          })()} • Sex: {patient.sex || "—"}
+        </div>
+        <div className="text-xs text-slate-600">Contact Number: {patient.contact_number || "—"}</div>
+        <div className="text-xs text-slate-600">
+          <span className="font-semibold">Contact Person:</span> {patient.emergency_contact_name || "—"} |
+          <span className="font-semibold"> Contact Number:</span> {patient.contact_person || "—"} |
+          <span className="font-semibold"> Relation:</span> {patient.emergency_relation || "—"}
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 p-4">
+          <div className="font-semibold mb-2">Doctor’s Notes</div>
+          <div className="whitespace-pre-wrap text-sm">{rec.doctor_notes || "—"}</div>
+          <div className="text-xs text-slate-500 mt-2">Doctor: {rec.doctor_full_name || "—"}</div>
+        </div>
+        <div className="rounded-lg border border-slate-200 p-4">
+          <div className="font-semibold mb-2">Nurse’s Notes</div>
+          <div className="text-sm">Height: {rec.height_cm ?? "—"} cm</div>
+          <div className="text-sm">Weight: {rec.weight_kg ?? "—"} kg</div>
+          <div className="text-sm">BP: {rec.blood_pressure ?? "—"}</div>
+          <div className="text-sm">Temperature: {rec.temperature_c ?? "—"} °C</div>
+          <div className="text-sm">Chief Complaint: {rec.chief_complaint || "—"}</div>
+        </div>
+      </div>
+
+      {/* Docs */}
+      <div className="mt-4 rounded-lg border border-slate-200 p-4">
+        <div className="font-semibold mb-2">Document Requests</div>
+        {loading && <div className="text-sm text-slate-600">Loading…</div>}
+        {err && <div className="text-sm text-red-600">{err}</div>}
         {!loading && !err && (
-          <div className="docs-list">
-            {docs.length === 0 && <div className="muted">No documents saved for this record.</div>}
+          <div className="flex flex-col gap-2">
+            {docs.length === 0 && <div className="text-sm text-slate-500">No documents saved for this record.</div>}
             {docs.map(d => (
-              <div key={d.id} className="doc-row">
-                <div className="doc-row__title">
-                  {d.type} <span className="doc-row__meta">• {new Date(d.created_at).toLocaleString()}</span>
+              <div key={d.id} className="rounded-lg border border-slate-200 px-3 py-2 text-sm flex items-center justify-between flex-wrap gap-2">
+                <div className="font-semibold uppercase">
+                  {d.type} <span className="normal-case text-slate-500 text-xs ml-2">• {new Date(d.created_at).toLocaleString()}</span>
                 </div>
-                <div className="doc-row__link">
-                  {d.url ? <a className="link" href={d.url} target="_blank" rel="noreferrer">open file</a> : "no file URL"}
+                <div className="text-xs">
+                  {d.url ? <a className="text-indigo-700 hover:underline" href={d.url} target="_blank" rel="noreferrer">open file</a> : "no file URL"}
                 </div>
               </div>
             ))}
@@ -745,19 +648,77 @@ function PastDocumentsViewLite({ rec, onBack }) {
   );
 }
 
-/* ---------- Input helpers ---------- */
+/* ---------- Modal + Input helpers (Tailwind) ---------- */
 
-/* Vitals/BP/Temp input with decimal and slash handling (unchanged) */
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder = "",
-  step,
-  mode,            // "height" | "weight" | "bp" | "temp" | undefined
-  error,
-}) {
+function Modal({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 z-[100]">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 flex items-end sm:items-center justify-center p-4">
+        <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl ring-1 ring-black/5">
+          <div className="flex items-center justify-between px-5 py-4 border-b">
+            <h3 className="text-base font-semibold">{title}</h3>
+            <button onClick={onClose} className="text-slate-500 hover:text-slate-800">✕</button>
+          </div>
+          <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReadOnly({ label, value }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1">{label}</label>
+      <input className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm" value={value} readOnly />
+    </div>
+  );
+}
+
+function TextField({ label, value, onChange, placeholder, error }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1">{label}</label>
+      <input
+        className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 ${error ? "border-red-400" : "border-slate-300"}`}
+        value={value}
+        onChange={(e)=>onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+    </div>
+  );
+}
+
+function DigitsField({ label, value, onChange, exactLen = 11, placeholder, error }) {
+  const handle = (e) => {
+    const digits = (e.target.value || "").replace(/\D/g, "").slice(0, exactLen);
+    onChange(digits);
+  };
+  const showLenError = value && String(value).length > 0 && String(value).length !== exactLen;
+  return (
+    <div className="mt-3">
+      <label className="block text-sm font-medium mb-1">{label}</label>
+      <input
+        className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 ${(error || showLenError) ? "border-red-400" : "border-slate-300"}`}
+        value={value}
+        onChange={handle}
+        inputMode="numeric"
+        placeholder={placeholder}
+        maxLength={exactLen}
+        title={`Must be exactly ${exactLen} digits`}
+      />
+      {(error || showLenError) && (
+        <p className="text-xs text-red-600 mt-1">{error || `Must be exactly ${exactLen} digits.`}</p>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, mode, placeholder, error }) {
   const handleChange = (e) => {
     let raw = e.target.value ?? "";
 
@@ -779,21 +740,17 @@ function Field({
       if (txt === ".") return "0.";
       txt = txt.replace(/[^0-9.]/g, "");
       const firstDot = txt.indexOf(".");
-      if (firstDot !== -1) {
-        txt = txt.slice(0, firstDot + 1) + txt.slice(firstDot + 1).replace(/\./g, "");
-      }
+      if (firstDot !== -1) txt = txt.slice(0, firstDot + 1) + txt.slice(firstDot + 1).replace(/\./g, "");
       if (firstDot !== -1) {
         let [intPart, decPartRaw] = txt.split(".");
         if (intPart === "") intPart = "0";
         const trailingDotOnly = decPartRaw === "" || decPartRaw == null;
         let decPart = (decPartRaw ?? "").slice(0, maxDecimals);
-
         let totalDigits = (intPart + decPart).length;
         if (totalDigits > maxDigitsTotal) {
           const overflow = totalDigits - maxDigitsTotal;
-          if (decPart.length >= overflow) {
-            decPart = decPart.slice(0, decPart.length - overflow);
-          } else {
+          if (decPart.length >= overflow) decPart = decPart.slice(0, decPart.length - overflow);
+          else {
             const still = overflow - decPart.length;
             decPart = "";
             intPart = intPart.slice(0, Math.max(0, intPart.length - still));
@@ -815,77 +772,18 @@ function Field({
     onChange(raw);
   };
 
-  const inputMode =
-    mode === "bp" ? "numeric" :
-    (mode ? "decimal" : undefined);
-
   return (
-    <div className="field">
-      <label className="label">{label}:</label>
+    <div>
+      <label className="block text-sm font-medium mb-1">{label}</label>
       <input
-        className={`input ${error ? 'has-error' : ''}`}
+        className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 ${error ? "border-red-400" : "border-slate-300"}`}
         value={value}
         onChange={handleChange}
-        type={mode ? "text" : type}
-        inputMode={inputMode}
-        step={step}
+        type="text"
+        inputMode={mode === "bp" ? "numeric" : "decimal"}
         placeholder={placeholder}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="none"
-        spellCheck={false}
       />
-      {error && <div className="error-text">{error}</div>}
-    </div>
-  );
-}
-
-/* Simple text field (letters/spaces are validated in validate()) */
-function TextField({ label, value, onChange, placeholder, error }) {
-  return (
-    <div className="field">
-      <label className="label">{label}:</label>
-      <input
-        className={`input ${error ? 'has-error' : ''}`}
-        value={value}
-        onChange={(e)=>onChange(e.target.value)}
-        placeholder={placeholder}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="words"
-        spellCheck={false}
-      />
-      {error && <div className="error-text">{error}</div>}
-    </div>
-  );
-}
-
-/* Digits-only field with exact length (for the 11-digit emergency number) */
-function DigitsField({ label, value, onChange, exactLen = 11, placeholder, error }) {
-  const handle = (e) => {
-    const digits = (e.target.value || "").replace(/\D/g, "").slice(0, exactLen);
-    onChange(digits);
-  };
-  const showLenError = value && String(value).length > 0 && String(value).length !== exactLen;
-  return (
-    <div className="field">
-      <label className="label">{label}:</label>
-      <input
-        className={`input ${(error || showLenError) ? 'has-error' : ''}`}
-        value={value}
-        onChange={handle}
-        inputMode="numeric"
-        placeholder={placeholder}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="none"
-        spellCheck={false}
-        maxLength={exactLen}
-        title={`Must be exactly ${exactLen} digits`}
-      />
-      {(error || showLenError) && (
-        <div className="error-text">{error || `Must be exactly ${exactLen} digits.`}</div>
-      )}
+      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </div>
   );
 }

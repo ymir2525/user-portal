@@ -13,8 +13,12 @@ import DoctorDashboard from "./apps/doctor/DoctorDashboard";
 import DoctorDashboardHome from "./apps/doctor/DoctorDashboardHome";
 import DoctorQueueList from "./apps/doctor/DoctorQueueList";
 import DoctorQueueChart from "./apps/doctor/DoctorQueueChart";
-import PatientsPlaceholder from "./apps/doctor/PatientsPlaceholder";
-import InventoryPlaceholder from "./apps/doctor/InventoryPlaceholder";
+
+import DoctorInventory from "./apps/doctor/DoctorInventory";
+// NEW: doctor versions of Patient list + Family
+import DoctorPatients from "./apps/doctor/DoctorPatients";
+import DoctorFamily from "./apps/doctor/DoctorFamily";
+
 import BhwQueueList from "./apps/bhw/BhwQueueList";
 import BhwQueueChart from "./apps/bhw/BhwQueueChart";
 
@@ -45,22 +49,22 @@ export default function App() {
             </RequireAuth>
           }
         />
-<Route
-  path="/bhw/queue"
-  element={
-    <RequireAuth role="BHW">
-      <BhwQueueList />
-    </RequireAuth>
-  }
-/>
-<Route
-  path="/bhw/queue/:recordId"
-  element={
-    <RequireAuth role="BHW">
-      <BhwQueueChart />
-    </RequireAuth>
-  }
-/>
+        <Route
+          path="/bhw/queue"
+          element={
+            <RequireAuth role="BHW">
+              <BhwQueueList />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/bhw/queue/:recordId"
+          element={
+            <RequireAuth role="BHW">
+              <BhwQueueChart />
+            </RequireAuth>
+          }
+        />
 
         {/* Protected: Doctor (enum value is 'Doctor') */}
         <Route
@@ -75,8 +79,12 @@ export default function App() {
           <Route index element={<DoctorDashboardHome />} />
           <Route path="queue" element={<DoctorQueueList />} />
           <Route path="queue/:recordId" element={<DoctorQueueChart />} />
-          <Route path="patients" element={<PatientsPlaceholder />} />
-          <Route path="inventory" element={<InventoryPlaceholder />} />
+
+          {/* NEW: real Patients list + Family detail for Doctor */}
+          <Route path="patients" element={<DoctorPatients />} />
+          <Route path="family/:familyNumber" element={<DoctorFamily />} />
+
+         <Route path="inventory" element={<DoctorInventory />} />
         </Route>
 
         {/* Protected: Nurse */}

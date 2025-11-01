@@ -121,21 +121,36 @@ export default function DoctorDashboardHome() {
   const nameOf = (p) => (p ? `${p.firstname ?? ""} ${p.surname ?? ""}`.trim() : "—");
   const loadStaffToday = useCallback(async () => {
     try {
-      const { startUtcIso, endUtcIso } = manilaTodayBoundsUTC();
-      const { data: logins } = await supabase.rpc("users_logged_in_between", { start_ts: startUtcIso, end_ts: endUtcIso });
-      const ids = Array.from(new Set((logins || []).map(u => u.id))).filter(Boolean);
-      if (ids.length === 0) { setStaff({ doctor: null, admin: [], nurse: [], bhw: [] }); return; }
-      const { data: profs } = await supabase.from("profiles").select("id, firstname, surname, role").in("id", ids);
+      const { data: logins, error: rpcErr } = await supabase.rpc(
+        "users_logged_in_between",
+        { start_ts: startUtcIso, end_ts: endUtcIso }
+      );
+      if (rpcErr) throw rpcErr;
+
+      const ids = Array.from(new Set((logins || []).map((u) => u.id))).filter(Boolean);
+      if (ids.length === 0) {
+        setStaff({ doctor: null, admin: [], nurse: [], bhw: [] });
+        return;
+      }
+
+      const { data: profs, error: profErr } = await supabase
+        .from("profiles")
+        .select("id, firstname, surname, role")
+        .in("id", ids);
+      if (profErr) throw profErr;
+
       const norm = (r) => String(r?.role || "").toUpperCase();
-      const doctor = (profs || []).find(p => norm(p) === "DOCTOR") || null;
-      const admin = (profs || []).filter(p => norm(p) === "ADMIN");
-      const nurse = (profs || []).filter(p => norm(p) === "NURSE");
-      const bhw = (profs || []).filter(p => norm(p) === "BHW");
+      const doctor = (profs || []).find((p) => norm(p) === "DOCTOR") || null;
+      const admin  = (profs || []).filter((p) => norm(p) === "ADMIN");
+      const nurse  = (profs || []).filter((p) => norm(p) === "NURSE");
+      const bhw    = (profs || []).filter((p) => norm(p) === "BHW");
+
       setStaff({ doctor, admin, nurse, bhw });
-    } catch {
+    } catch (e) {
+      console.error("DoctorDashboardHome loadStaffToday error:", e);
       setStaff({ doctor: null, admin: [], nurse: [], bhw: [] });
     }
-  }, []);
+  }, [startUtcIso, endUtcIso]);
 
   // boot + polling
   useEffect(() => {
@@ -145,7 +160,7 @@ export default function DoctorDashboardHome() {
       if (selectedClass) loadOverview(selectedClass);
     }, 15000);
     return () => clearInterval(id);
-  }, []); // eslint-disable-line
+  }, [loadAdmTop, loadMedicineOnStock, loadClassifications, loadAlerts, loadStaffToday, selectedClass, loadOverview]);
 
   useEffect(() => { if (selectedClass) loadOverview(selectedClass); }, [selectedClass, loadOverview]);
 
@@ -174,8 +189,8 @@ export default function DoctorDashboardHome() {
       </div>
 
       {/* bottom row */}
-      <div className="grid-2">
-        <div className="panel" style={{ backgroundColor: PANEL_BG, borderColor: PEACH }}>
+      <div className="grid-2" style={{ alignItems: "start" }}>
+        <div className="panel" style={{ backgroundColor: PANEL_BG, borderColor: PEACH, alignSelf: "start" }}>
           <div className="panel__title">Medicine Inventory Overview</div>
           <div className="mb-2">
             <label className="small muted">Classification</label>{" "}
@@ -197,15 +212,49 @@ export default function DoctorDashboardHome() {
           </div>
         </div>
 
-        <div className="panel" style={{ backgroundColor: PANEL_BG, borderColor: PEACH }}>
+        <div className="panel" style={{ backgroundColor: PANEL_BG, borderColor: PEACH, alignSelf: "start" }}>
           <div className="panel__title">STAFF TODAY</div>
-          <div className="staff">
-            <div className="row"><div>{nameOf(staff.doctor)}</div><div className="muted">Doctor-in-Charge</div></div>
-            {staff.admin.map(p => (<div key={p.id} className="row"><div>{nameOf(p)}</div><div className="muted">Admin</div></div>))}
-            {staff.nurse.map(p => (<div key={p.id} className="row"><div>{nameOf(p)}</div><div className="muted">Nurse</div></div>))}
-            {staff.bhw.map(p => (<div key={p.id} className="row"><div>{nameOf(p)}</div><div className="muted">BHW</div></div>))}
+
+          {/* Compact two-column grid: name | role */}
+          <div
+            className="staff"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              columnGap: "12px",
+              rowGap: "6px",
+              fontSize: "0.95rem",
+              lineHeight: 1.25,
+            }}
+          >
+            <div> {nameOf(staff.doctor)} </div>
+            <div className="muted">Doctor-in-Charge</div>
+
+            {staff.admin.map((p) => (
+              <React.Fragment key={p.id}>
+                <div>{nameOf(p)}</div>
+                <div className="muted">Admin</div>
+              </React.Fragment>
+            ))}
+
+            {staff.nurse.map((p) => (
+              <React.Fragment key={p.id}>
+                <div>{nameOf(p)}</div>
+                <div className="muted">Nurse</div>
+              </React.Fragment>
+            ))}
+
+            {staff.bhw.map((p) => (
+              <React.Fragment key={p.id}>
+                <div>{nameOf(p)}</div>
+                <div className="muted">BHW</div>
+              </React.Fragment>
+            ))}
+
             {!staff.admin.length && !staff.nurse.length && !staff.bhw.length && (
-              <div className="muted small">No staff logins recorded today.</div>
+              <div className="muted small" style={{ gridColumn: "1 / -1" }}>
+                No staff logins recorded today.
+              </div>
             )}
           </div>
         </div>

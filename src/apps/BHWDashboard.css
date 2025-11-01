@@ -145,3 +145,23 @@
 /* Prevent scroll chaining/bounce inside panels (optional) */
 .app--bhw .sidebar,
 .app--bhw .main { overscroll-behavior: contain; }
+/* keep header above everything */
+.app--bhw .app-header { z-index: 200; }
+
+/* visible, high-contrast logout button */
+.btn--link {
+  background: transparent;
+  border: 1px solid #0d3554;
+  color: #0d3554;
+  padding: 8px 12px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+.btn--link:hover {
+  background: #0d3554;
+  color: #fff;
+}
+.btn--logout {
+  /* ensure it never collapses or hides on narrow screens */
+  white-space: nowrap;
+}

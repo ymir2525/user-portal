@@ -1,10 +1,10 @@
-// src/apps/admin/AdminPatientRecords.jsx
+// src/apps/doctor/DoctorPatients.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import "../doctor/doctorDash.css"; // reuse the same light styles as Doctor
+import "./doctorDash.css";
 
-export default function AdminPatientRecords() {
+export default function DoctorPatients() {
   const nav = useNavigate();
   const [q, setQ] = useState("");
   const [sortAsc, setSortAsc] = useState(true);
@@ -13,7 +13,7 @@ export default function AdminPatientRecords() {
   const [err, setErr] = useState("");
   const firstRun = useRef(false);
 
-  // guard: only ADMIN
+  // guard: only DOCTOR
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -22,7 +22,7 @@ export default function AdminPatientRecords() {
       if (!uid) { nav("/login", { replace: true }); return; }
       const { data: prof, error } = await supabase
         .from("profiles").select("role").eq("id", uid).single();
-      if (error || !prof || String(prof.role).toUpperCase() !== "ADMIN") {
+      if (error || !prof || String(prof.role).toUpperCase() !== "DOCTOR") {
         await supabase.auth.signOut().catch(() => {});
         nav("/login", { replace: true });
         return;
@@ -62,7 +62,6 @@ export default function AdminPatientRecords() {
       const { data, error } = await query;
       if (error) throw error;
 
-      // de-duplicate by (family_number, surname)
       const map = new Map();
       (data || []).forEach(r => {
         const key = `${r.family_number}||${r.surname}`;
@@ -77,9 +76,6 @@ export default function AdminPatientRecords() {
       setLoading(false);
     }
   }
-
-  // If you route family detail somewhere else, change this base path:
-  const linkBase = "/admin/family"; // e.g. route like /admin/family/:familyNumber
 
   return (
     <section className="section section--records">
@@ -116,6 +112,7 @@ export default function AdminPatientRecords() {
         >
           {loading ? "Loading..." : "Refresh"}
         </button>
+        {/* doctor view: no Add Patient */}
         <div />
       </div>
 
@@ -125,7 +122,7 @@ export default function AdminPatientRecords() {
         {items.map((row) => (
           <Link
             key={`${row.family_number}-${row.surname}`}
-            to={`${linkBase}/${encodeURIComponent(row.family_number)}`}
+            to={`/doctor/family/${encodeURIComponent(row.family_number)}`}
             className="family-list__item"
           >
             {row.family_number} - {row.surname}
