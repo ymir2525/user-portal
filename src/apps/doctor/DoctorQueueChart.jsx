@@ -1,4 +1,4 @@
-// src/apps/admin/AdminChartView.jsx
+// src/apps/doctor/DoctorQueueChart.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -13,7 +13,7 @@ import PastDocumentsView from "../../components/past/PastDocumentsView";
 import MedCertForm from "../../components/MedCertForm";
 import LabRequestForm from "../../components/LabRequestForm";
 import PrescriptionForm from "../../components/PrescriptionForm";
-import "../doctor/doctorDash.css";
+import "./doctorDash.css";
 
 function ageDisplayFromBirthdate(birthdate, fallbackAge) {
   if (!birthdate) return (fallbackAge ?? "") === "" ? "—" : String(fallbackAge);
@@ -28,16 +28,14 @@ function ageDisplayFromBirthdate(birthdate, fallbackAge) {
 const sexDisplay = (sex) =>
   (!sex ? "—" : String(sex).toUpperCase().replace("WOMEN", "FEMALE").replace("MEN", "MALE"));
 
-export default function AdminChartView() {
+export default function DoctorQueueChart() {
   const nav = useNavigate();
-  // Accept BOTH param styles so links from different places keep working
-  const { recordId, patientId } = useParams();
-  const effectiveRecordId = recordId ?? null;
-  const effectivePatientId = patientId ?? null;
+  const { recordId } = useParams();
 
   const [banner, setBanner] = useState(null);
   const [rec, setRec] = useState(null);
 
+  // removed tabs; keep only docView switching
   const [docView, setDocView] = useState("none"); // 'none'|'referral'|'prescription'|'lab'|'medcert'
   const [saving, setSaving] = useState(false);
 
@@ -49,12 +47,12 @@ export default function AdminChartView() {
   const [classifications, setClassifications] = useState([]);
   const [namesByClass, setNamesByClass] = useState(new Map());
 
-  // Distributed rows
+  // Distributed (multiple rows) – extended with dosage, medicine_type, sig
   const [distRows, setDistRows] = useState([
     { classification: "", name: "", qty: "", dosage: "", medicine_type: "", sig: "" },
   ]);
 
-  // Prescribed rows
+  // Prescribed (multiple rows; manual name allowed)
   const [rxRows, setRxRows] = useState([
     { classification: "", name: "", qty: "", nameMode: "dropdown" },
   ]);
@@ -63,7 +61,7 @@ export default function AdminChartView() {
   const [distributedList, setDistributedList] = useState([]);
   const [prescribedList, setPrescribedList] = useState([]);
 
-  // Past
+  // past
   const [past, setPast] = useState([]);
   const [loadingPast, setLoadingPast] = useState(false);
   const [selectedPast, setSelectedPast] = useState(null);
@@ -79,95 +77,48 @@ export default function AdminChartView() {
   /* ---------- load record ---------- */
   const loadRecord = useCallback(async () => {
     try {
-      setBanner(null);
+      const { data, error } = await supabase
+        .from("patient_records")
+        .select(`
+          *, 
+          patients:patient_id (
+            id, first_name, middle_name, surname, family_number,
+            sex, age, birthdate, contact_number, contact_person
+          )
+        `)
+        .eq("id", recordId)
+        .single();
+      if (error) throw error;
 
-      if (effectiveRecordId) {
-        // Load by patient_records.id (queue view flow)
-        const { data, error } = await supabase
-          .from("patient_records")
-          .select(`
-            *,
-            patients:patient_id (
-              id, first_name, middle_name, surname, family_number,
-              sex, age, birthdate, contact_number, contact_person
-            )
-          `)
-          .eq("id", effectiveRecordId)
-          .single();
-        if (error) throw error;
+      const active = {
+        record_id: data.id,
+        patient_id: data.patient_id,
+        family_number: data.patients?.family_number ?? "",
+        first_name: data.patients?.first_name ?? "",
+        middle_name: data.patients?.middle_name ?? "",
+        surname: data.patients?.surname ?? "",
+        sex: data.patients?.sex ?? "",
+        age: data.patients?.age ?? "",
+        birthdate: data.patients?.birthdate ?? null,
+        contact_number: data.patients?.contact_number ?? "",
+        contact_person: data.patients?.contact_person ?? "",
+        height_cm: data.height_cm,
+        weight_kg: data.weight_kg,
+        blood_pressure: data.blood_pressure,
+        temperature_c: data.temperature_c,
+        chief_complaint: data.chief_complaint,
+        doctor_assessment: data.doctor_assessment ?? "",
+        doctor_management: data.doctor_management ?? "",
+      };
 
-        const active = {
-          record_id: data.id,
-          patient_id: data.patient_id,
-          family_number: data.patients?.family_number ?? "",
-          first_name: data.patients?.first_name ?? "",
-          middle_name: data.patients?.middle_name ?? "",
-          surname: data.patients?.surname ?? "",
-          sex: data.patients?.sex ?? "",
-          age: data.patients?.age ?? "",
-          birthdate: data.patients?.birthdate ?? null,
-          contact_number: data.patients?.contact_number ?? "",
-          contact_person: data.patients?.contact_person ?? "",
-          height_cm: data.height_cm,
-          weight_kg: data.weight_kg,
-          blood_pressure: data.blood_pressure,
-          temperature_c: data.temperature_c,
-          chief_complaint: data.chief_complaint,
-          doctor_assessment: data.doctor_assessment ?? "",
-          doctor_management: data.doctor_management ?? "",
-        };
-        setRec(active);
-        setDocAssessment(active.doctor_assessment || "");
-        setDocManagement(active.doctor_management || "");
-        return;
-      }
-
-      if (effectivePatientId) {
-        // Fallback: load directly from patients (old links)
-        const { data, error } = await supabase
-          .from("patients")
-          .select(`
-            id, family_number, first_name, middle_name, surname,
-            sex, age, birthdate, contact_number, contact_person,
-            height_cm, weight_kg, blood_pressure, temperature_c, chief_complaint
-          `)
-          .eq("id", effectivePatientId)
-          .single();
-        if (error) throw error;
-
-        const merged = {
-          record_id: null,
-          patient_id: data.id,
-          family_number: data.family_number ?? "",
-          first_name: data.first_name ?? "",
-          middle_name: data.middle_name ?? "",
-          surname: data.surname ?? "",
-          sex: data.sex ?? "",
-          age: data.age ?? "",
-          birthdate: data.birthdate ?? null,
-          contact_number: data.contact_number ?? "",
-          contact_person: data.contact_person ?? "",
-          height_cm: data.height_cm,
-          weight_kg: data.weight_kg,
-          blood_pressure: data.blood_pressure,
-          temperature_c: data.temperature_c,
-          chief_complaint: data.chief_complaint,
-          doctor_assessment: "",
-          doctor_management: "",
-        };
-        setRec(merged);
-        setDocAssessment("");
-        setDocManagement("");
-        return;
-      }
-
-      // Neither param present
-      setBanner({ type: "err", msg: "Missing route parameter. No recordId or patientId provided." });
+      setRec(active);
+      setDocAssessment(active.doctor_assessment || "");
+      setDocManagement(active.doctor_management || "");
     } catch (e) {
       console.error(e);
       setBanner({ type: "err", msg: e.message || "Failed to load chart" });
     }
-  }, [effectiveRecordId, effectivePatientId, supabase]);
+  }, [recordId]);
 
   /* ---------- load medicines from inventory (non-expired) ---------- */
   const loadMedicines = useCallback(async () => {
@@ -209,9 +160,9 @@ export default function AdminChartView() {
     [rec]
   );
 
-  /* ---------- past records (only if we know patient_id) ---------- */
+  /* ---------- past records (now always loaded, shown below docs) ---------- */
   const loadPastRecords = useCallback(async () => {
-    if (!rec?.patient_id) return;
+    if (!rec) return;
     try {
       setLoadingPast(true);
       setSelectedPast(null);
@@ -230,15 +181,21 @@ export default function AdminChartView() {
     } finally {
       setLoadingPast(false);
     }
-  }, [rec?.patient_id]);
-  useEffect(() => { void loadPastRecords(); }, [loadPastRecords]);
+  }, [rec]);
+  useEffect(() => {
+    if (rec?.patient_id) void loadPastRecords();
+  }, [rec?.patient_id, loadPastRecords]);
 
   /* ---------- helpers ---------- */
   const namesForClass = (cls) => Array.from(namesByClass.get(cls) || []).sort((a, b) => a.localeCompare(b));
 
+ 
+
   const updateDistRow = (i, patch) =>
     setDistRows((rows) =>
-      rows.map((r, idx) => (idx === i ? { ...r, ...patch, ...(patch.classification ? { name: "" } : null) } : r))
+      rows.map((r, idx) =>
+        idx === i ? { ...r, ...patch, ...(patch.classification ? { name: "" } : null) } : r
+      )
     );
 
   const removeDistRow = (i) =>
@@ -248,31 +205,58 @@ export default function AdminChartView() {
         : rows.filter((_, idx) => idx !== i)
     );
 
-  const addRxRow = () => setRxRows((rows) => [...rows, { classification: "", name: "", qty: "", nameMode: "dropdown" }]);
+  // Prescribed row helpers
+  const addRxRow = () =>
+    setRxRows((rows) => [...rows, { classification: "", name: "", qty: "", nameMode: "dropdown" }]);
   const updateRxRow = (i, patch) =>
     setRxRows((rows) =>
       rows.map((r, idx) =>
-        idx === i ? { ...r, ...patch, ...(patch.classification ? { name: "", nameMode: r.nameMode } : null) } : r
+        idx === i
+          ? { ...r, ...patch, ...(patch.classification ? { name: "", nameMode: r.nameMode } : null) }
+          : r
       )
     );
   const removeRxRow = (i) =>
-    setRxRows((rows) => (rows.length === 1 ? [{ classification: "", name: "", qty: "", nameMode: "dropdown" }] : rows.filter((_, idx) => idx !== i)));
+    setRxRows((rows) =>
+      rows.length === 1 ? [{ classification: "", name: "", qty: "", nameMode: "dropdown" }] : rows.filter((_, idx) => idx !== i)
+    );
 
+  // Add to preview/lists – Distributed: also append to Management text
   const addAllDistributedToList = () => {
-    const valid = distRows.filter((r) => r.classification && r.name && Number(r.qty) > 0 && Number.isFinite(Number(r.qty)));
+    const valid = distRows.filter(
+      (r) =>
+        r.classification &&
+        r.name &&
+        Number(r.qty) > 0 &&
+        Number.isFinite(Number(r.qty))
+    );
     if (!valid.length) {
       alert("Complete at least one distributed medicine row (classification, name, positive quantity).");
       return;
     }
+
     const mgmtBlocks = valid.map((r) => {
-      const headline = [r.name || "", r.qty ? String(Number(r.qty)) : "", (r.dosage || "").trim(), (r.medicine_type || "").trim() ? `/${(r.medicine_type || "").trim()}` : ""]
-        .filter(Boolean)
-        .join(" ")
-        .replace(/\s+\/\s*/g, " / ");
-      const sigLine = (r.sig || "").trim() ? `\n(${(r.sig || "").trim()})` : "";
+      const name = r.name || "";
+      const qty = Number(r.qty) || 0;
+      const dosage = (r.dosage || "").trim();
+      const mtype = (r.medicine_type || "").trim();
+      const sig = (r.sig || "").trim();
+
+      const headline =
+        [name, qty ? String(qty) : "", dosage, mtype ? `/${mtype}` : ""]
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\s+\/\s*/g, " / ");
+
+      const sigLine = sig ? `\n(${sig})` : "";
       return `${headline}${sigLine}`;
     });
-    setDocManagement((prev) => `${prev?.trim() ? `${prev}\n\n` : ""}${mgmtBlocks.join("\n\n")}`);
+
+    setDocManagement((prev) => {
+      const glue = prev?.trim() ? "\n\n" : "";
+      return `${prev || ""}${glue}${mgmtBlocks.join("\n\n")}`;
+    });
+
     setDistributedList((prev) => [
       ...prev,
       ...valid.map((r) => ({
@@ -284,11 +268,14 @@ export default function AdminChartView() {
         sig: (r.sig || "").trim(),
       })),
     ]);
+
     setDistRows([{ classification: "", name: "", qty: "", dosage: "", medicine_type: "", sig: "" }]);
   };
 
   const addAllPrescribedToList = () => {
-    const valid = rxRows.filter((r) => r.classification && r.name && Number(r.qty) > 0 && Number.isFinite(Number(r.qty)));
+    const valid = rxRows.filter(
+      (r) => r.classification && r.name && Number(r.qty) > 0 && Number.isFinite(Number(r.qty))
+    );
     if (!valid.length) {
       alert("Complete at least one prescribed medicine row (classification, name, positive quantity).");
       return;
@@ -297,6 +284,9 @@ export default function AdminChartView() {
     setRxRows([{ classification: "", name: "", qty: "", nameMode: "dropdown" }]);
   };
 
+  const handlePrintPreview = () => window.print();
+
+  /* ---------- save chart ---------- */
   const canSave = !!docAssessment?.trim() && !!docManagement?.trim() && !saving;
 
   async function saveMedicinesDocument(record_id) {
@@ -340,121 +330,135 @@ export default function AdminChartView() {
   }
 
   const saveChart = async () => {
-    if (!rec) return;
-    try {
-      setSaving(true);
-      setBanner(null);
+  if (!rec) return;
+  try {
+    setSaving(true);
+    setBanner(null);
 
-      const { data: sess } = await supabase.auth.getSession();
-      const uid = sess?.session?.user?.id;
-      const { data: me } = await supabase.from("profiles").select("firstname,surname").eq("id", uid).single();
-      const doctor_full_name = me ? `${me.firstname ?? ""} ${me.surname ?? ""}`.trim() : null;
+    const { data: sess } = await supabase.auth.getSession();
+    const uid = sess?.session?.user?.id;
+    const { data: me } = await supabase
+      .from("profiles")
+      .select("firstname,surname")
+      .eq("id", uid)
+      .single();
+    const doctor_full_name = me ? `${me.firstname ?? ""} ${me.surname ?? ""}`.trim() : null;
 
-      const combinedNotes =
-        `Assessment / Diagnosis:\n${(docAssessment || "").trim()}\n\n` +
-        `Management:\n${(docManagement || "").trim()}`;
+    const combinedNotes =
+      `Assessment / Diagnosis:\n${(docAssessment || "").trim()}\n\n` +
+      `Management:\n${(docManagement || "").trim()}`;
 
-      // If we don’t have a record_id (opened by patientId), we can’t save back into patient_records
-      if (!rec.record_id) {
-        setBanner({ type: "err", msg: "This view was opened without a record. Open from the queue to save." });
-        setSaving(false);
-        return;
-      }
+    const { error: upErr } = await supabase
+      .from("patient_records")
+      .update({
+        doctor_assessment: docAssessment || null,
+        doctor_management: docManagement || null,
+        doctor_notes: combinedNotes || null,
+        doctor_id: uid,
+        doctor_full_name,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        queued: false,
+      })
+      .eq("id", rec.record_id);
+    if (upErr) throw upErr;
 
-      const { error: upErr } = await supabase
-        .from("patient_records")
-        .update({
-          doctor_assessment: docAssessment || null,
-          doctor_management: docManagement || null,
-          doctor_notes: combinedNotes || null,
-          doctor_id: uid,
-          doctor_full_name,
-          status: "completed",
-          completed_at: new Date().toISOString(),
-          queued: false,
-        })
-        .eq("id", rec.record_id);
-      if (upErr) throw upErr;
+    // NEW: clear patient's queued flag so all queues stay in sync
+    const { error: patClearErr } = await supabase
+      .from("patients")
+      .update({ queued: false, queued_at: null })
+      .eq("id", rec.patient_id);
+    if (patClearErr) throw patClearErr;
 
-      await saveMedicinesDocument(rec.record_id);
-      await decrementInventoryForDistributed(distributedList);
-      await logDispenseTransactions(distributedList, rec);
-      setBanner({ type: "ok", msg: "Chart saved. Inventory updated and medicines recorded." });
-      nav("/admin/queue");
-    } catch (e) {
-      console.error(e);
-      setBanner({ type: "err", msg: e.message || "Save failed" });
-    } finally {
-      setSaving(false);
-    }
-  };
+    await saveMedicinesDocument(rec.record_id);
+    await decrementInventoryForDistributed(distributedList);
+    await logDispenseTransactions(distributedList, rec);
+
+    setBanner({ type: "ok", msg: "Chart saved. Inventory updated and medicines recorded." });
+    nav("/doctor/queue");
+  } catch (e) {
+    console.error(e);
+    setBanner({ type: "err", msg: e.message || "Save failed" });
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   if (!rec) {
     return (
       <div className="stack">
         {banner && <div className={`banner ${banner.type === "ok" ? "banner--ok" : "banner--err"}`}>{banner.msg}</div>}
         <div className="muted small">Loading…</div>
-        <button className="btn btn--outline" onClick={() => nav("/admin/queue")}>Back</button>
+        <button className="btn btn--outline" onClick={() => nav("/doctor/queue")}>Back</button>
       </div>
     );
   }
 
   async function logDispenseTransactions(items, rec) {
-    if (!items.length) return;
-    const { data: sess } = await supabase.auth.getSession();
-    const staff_id = sess?.session?.user?.id ?? null;
+  if (!items.length) return;
+  const { data: sess } = await supabase.auth.getSession();
+  const staff_id = sess?.session?.user?.id ?? null;
 
-    for (const it of items) {
-      let dosage_form = it.medicine_type || null;
+  // Build a pretty patient name once
+  const patient_name = [rec.first_name, rec.middle_name, rec.surname]
+    .filter(Boolean)
+    .join(" ");
 
-      if (!dosage_form) {
-        const { data: cat } = await supabase
-          .from("medicine_catalog")
+  for (const it of items) {
+    let dosage_form = it.medicine_type || null;
+
+    if (!dosage_form) {
+      const { data: cat } = await supabase
+        .from("medicine_catalog")
+        .select("dosage_form")
+        .eq("classification", it.classification)
+        .eq("medicine_name", it.name)
+        .maybeSingle();
+      if (cat?.dosage_form) dosage_form = cat.dosage_form;
+      else {
+        const { data: invLot } = await supabase
+          .from("medicine_inventory")
           .select("dosage_form")
           .eq("classification", it.classification)
           .eq("medicine_name", it.name)
+          .gte("expiration_date", manilaDate) // already using Manila
+          .order("expiration_date", { ascending: true })
+          .limit(1)
           .maybeSingle();
-
-        if (cat?.dosage_form) dosage_form = cat.dosage_form;
-        else {
-          const { data: invLot } = await supabase
-            .from("medicine_inventory")
-            .select("dosage_form")
-            .eq("classification", it.classification)
-            .eq("medicine_name", it.name)
-            .gte("expiration_date", manilaDate)
-            .order("expiration_date", { ascending: true })
-            .limit(1)
-            .maybeSingle();
-          dosage_form = invLot?.dosage_form ?? null;
-        }
+        dosage_form = invLot?.dosage_form ?? null;
       }
-
-      await supabase.from("medicine_transactions").insert({
-        direction: "out",
-        classification: it.classification,
-        medicine_name: it.name,
-        dosage_form,
-        quantity: Number(it.qty) || 0,
-        record_id: rec.record_id,
-        patient_id: rec.patient_id,
-        staff_id,
-        note: "Distributed via AdminChartView",
-      });
     }
+
+    await supabase.from("medicine_transactions").insert({
+  direction: "out",
+  classification: it.classification,
+  medicine_name: it.name,
+  dosage_form,
+  quantity: Number(it.qty) || 0,
+  record_id: rec.record_id,
+  patient_id: rec.patient_id,   // keep
+  staff_id,
+  note: "Distributed via DoctorQueueChart",
+});
+
   }
+}
+
+
+
 
   return (
     <div className="stack pt-1">
       {banner && <div className={`banner ${banner.type === "ok" ? "banner--ok" : "banner--err"}`}>{banner.msg}</div>}
       <button
-        onClick={() => nav("/admin/queue")}
+        onClick={() => nav("/doctor/queue")}
         style={{ color: "black", border: "1px solid black", padding: "4px", width: "140px" }}
       >
         back
       </button>
 
-      {/* ====== Main Day Chart ====== */}
+      {/* ====== Main Day Chart (tabs removed) ====== */}
       {docView === "none" && (
         <div className="stack">
           <PatientHeader patient={activeWithDisplays} />
@@ -482,7 +486,7 @@ export default function AdminChartView() {
             <NurseBlock record={rec} />
           </div>
 
-          {/* ====== MEDICINE SECTION ====== */}
+          {/* ====== MEDICINE SECTION (unchanged functionality) ====== */}
           <div className="panel">
             <div className="panel__title">Medicine</div>
             <div className="small" style={{ fontWeight: 700, marginTop: 4 }}>Medicine Consumption</div>
@@ -585,6 +589,7 @@ export default function AdminChartView() {
                 ))}
 
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  
                   <button type="button" className="btn btn--orange" onClick={addAllDistributedToList}>
                     Add to List
                   </button>
@@ -665,6 +670,7 @@ export default function AdminChartView() {
                 ))}
 
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                 
                   <button type="button" className="btn btn--orange" onClick={addAllPrescribedToList}>
                     Add to List
                   </button>
@@ -682,7 +688,7 @@ export default function AdminChartView() {
             <button className="link" onClick={() => setDocView("medcert")}>Medical Certificate</button>
           </div>
 
-          {/* ====== PAST VISITS ====== */}
+          {/* ====== PAST VISITS (centered, narrower) ====== */}
           <div className="panel" style={{ margin: "10px 20px 0", padding: "12px 16px" }}>
             <div className="panel__title">Past Visits</div>
             {loadingPast && <div className="muted small">Loading…</div>}
@@ -716,13 +722,13 @@ export default function AdminChartView() {
             )}
           </div>
 
-          {/* ====== ACTIONS ====== */}
+          {/* ====== ACTIONS: Discard + Save (visible) ====== */}
           <div style={{ display: "flex", gap: 12, justifyContent: "center", maxWidth: 560, margin: "16px auto 0" }}>
             <button
               className="btn btn--outline"
               style={{ borderColor: "#d33", color: "#d33", minWidth: 180 }}
               onClick={() => {
-                if (window.confirm("Discard changes to this chart?")) nav("/admin/queue");
+                if (window.confirm("Discard changes to this chart?")) nav("/doctor/queue");
               }}
             >
               Discard
@@ -746,7 +752,7 @@ export default function AdminChartView() {
         </div>
       )}
 
-      {/* ====== Document sub-views ====== */}
+      {/* ====== Document sub-views (unchanged) ====== */}
       {docView === "referral" && (
         <ReferralForm
           active={rec}

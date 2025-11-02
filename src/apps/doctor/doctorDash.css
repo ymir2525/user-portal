@@ -1,0 +1,102 @@
+/* src/pages/doctor/doctorDash.css */
+/* Doctor Dashboard — Tailwind-free */
+:root{
+  --orange-50:#fff7ed; --orange-100:#ffedd5; --orange-200:#fed7aa; --orange-300:#fdba74;
+  --orange-400:#fb923c; --orange-500:#f97316; --orange-600:#ea580c;
+  --blue-900:#0b2240; --blue-800:#12315f; --blue-700:#1b3e76;
+  --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb; --gray-300:#d1d5db;
+  --gray-500:#6b7280; --gray-600:#4b5563; --gray-700:#374151;
+  --green-100:#dcfce7; --green-700:#047857;
+  --red-100:#fee2e2; --red-700:#b91c1c; --green-ok:#15803d;
+}
+*{box-sizing:border-box}
+body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+.muted{ color:var(--gray-600); } .small{ font-size:12px; } .text-center{ text-align:center; } .pt-1{ padding-top:12px; }
+/* Layout */
+.docdash.layout{ min-height:100vh; display:flex; background:#fff; color:#111827; overflow:hidden; }
+/* Header */
+.app-header{ position:fixed; top:0; left:0; right:0; height:56px; background:var(--orange-500); color:#fff;
+  display:flex; align-items:center; justify-content:space-between; padding:0 16px; z-index:40; box-shadow:0 1px 0 rgba(0,0,0,.06); }
+.app-header__title{ font-weight:700; }
+.link{ color:#0b57d0; background:none; border:none; padding:0; cursor:pointer; text-decoration:underline; font:inherit; }
+.link--small{ font-size:14px; }
+/* Sidebar */
+.sidebar{ width:260px; background:var(--blue-900); color:#fff; padding:56px 12px 16px; min-height:100vh; }
+.brand{ display:flex; align-items:center; gap:10px; margin-bottom:16px; padding:0 4px; } .brand__circle{ width:28px; height:28px; border-radius:50%; background:#fff; }
+.brand__text{ line-height:1.1; } .brand__title{ font-size:12px; opacity:.9; }
+.nav{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+.nav__item{ width:100%; text-align:left; padding:10px 12px; border-radius:8px; border:1px solid transparent; background:transparent; color:#fff; cursor:pointer; text-decoration:none; }
+.nav__item:hover{ background:var(--blue-800); }
+.nav__item--active{ background:#fff; color:#111827; border-color:#fff; }
+/* Main */
+.main{ flex:1; padding:72px 24px 24px; background:#fff; }
+/* Containers */
+.stack{ display:flex; flex-direction:column; gap:16px; }
+.grid-2{ display:grid; grid-template-columns:1fr; gap:16px; }
+@media (min-width: 900px){ .grid-2{ grid-template-columns:1fr 1fr; } }
+.panel{ border:1px solid var(--gray-200); border-radius:10px; padding:12px; background:#fff; }
+.panel__title{ font-weight:700; margin-bottom:8px; }
+/* Tiles */
+.tiles{ display:grid; grid-template-columns:1fr; gap:12px; }
+@media (min-width: 900px){ .tiles{ grid-template-columns:1fr 1fr 1fr; } }
+.tile{ border:1px solid var(--gray-200); border-radius:10px; padding:16px; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+.tile__big{ font-size:40px; font-weight:800; } .tile__label{ font-size:13px; color:var(--gray-700); margin-top:4px; }
+.tile--alert{ align-items:stretch; }
+/* Select/list */
+.select{ border:1px solid var(--gray-300); border-radius:6px; padding:6px 8px; background:#fff; }
+.scroll{ max-height:280px; overflow:auto; padding-right:6px; }
+.row{ display:flex; align-items:center; justify-content:space-between; padding:6px 2px; border-bottom:1px dashed var(--gray-200); }
+.ul{ list-style:disc; margin-left:20px; font-size:14px; }
+/* Tabs */
+.tabs{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:8px; }
+.tab{ text-align:center; border-radius:8px; padding:8px 0; font-size:14px; background:var(--orange-100); border:1px solid var(--orange-200); cursor:pointer; }
+.tab--active{ background:var(--orange-500); color:#fff; border-color:var(--orange-500); }
+/* Banner */
+.banner{ margin-bottom:12px; font-size:14px; padding:8px 10px; border-radius:8px; }
+.banner--ok{ background:var(--green-100); color:var(--green-ok); }
+.banner--err{ background:var(--red-100); color:var(--red-700); }
+/* Inputs */
+.textarea{ width:100%; min-height:180px; border:1px solid var(--gray-300); border-radius:6px; padding:8px 12px; background:#fff; font:inherit; resize:vertical; }
+/* Buttons */
+.btn{ display:inline-flex; align-items:center; justify-content:center; cursor:pointer; border:1px solid transparent; border-radius:8px; font:inherit; padding:8px 12px; }
+.btn:disabled{ opacity:.6; cursor:not-allowed; }
+.btn--primary-wide{ width:100%; background:var(--orange-500); color:#fff; border-color:var(--orange-600); padding:10px 12px; }
+.btn--primary-wide:hover:not(:disabled){ background:var(--orange-600); }
+.btn--primary{ background:var(--orange-500); color:#fff; border-color:var(--orange-600); }
+.btn--primary:hover{ background:var(--orange-600); }
+.btn--outline{ background:#fff; color:#b91c1c; border-color:#f4b7b7; border-width:1px; }
+.btn--outline:hover{ background:#feecec; }
+/* Inline links */
+.inline-links{ display:flex; flex-wrap:wrap; gap:16px; }
+/* Past */
+.past-row{ display:flex; align-items:center; justify-content:space-between; border:1px solid var(--gray-200); border-radius:8px; padding:8px 12px; background:#fff; }
+.past-row:hover{ background:var(--orange-50); }
+.past-row__doc{ color:#374151; }
+/* Queue */
+.page-title{ font-weight:700; margin-bottom:8px; }
+.queue-list{ display:flex; flex-direction:column; gap:10px; }
+.queue-card{ border:1px solid var(--gray-200); border-radius:10px; padding:10px 12px; background:#fff; display:flex; align-items:center; justify-content:space-between; }
+.queue-card__left{ min-width:0; } .queue-card__name{ font-weight:700; }
+.queue-card__meta{ margin-top:2px; } .queue-card__right{ display:flex; gap:8px; }
+/* --- Fix sticky action buttons visibility --- */
+.past-actions--sticky { z-index: 50; background:#fff; }
+
+/* Some themes dim buttons until hover; force normal visibility here */
+.past-actions--sticky .btn {
+  opacity: 1 !important;
+  filter: none !important;
+  visibility: visible !important;
+}
+
+/* Give the action buttons a solid style so text doesn't blend in */
+.past-actions--sticky .btn--accent-block {
+  background: var(--orange-500) !important;
+  color: #fff !important;
+  border: 1px solid var(--orange-600) !important;
+}
+
+.past-actions--sticky .btn--accent-block:hover,
+.past-actions--sticky .btn--accent-block:focus {
+  background: var(--orange-600) !important;
+  border-color: var(--orange-600) !important;
+}
