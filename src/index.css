@@ -20,3 +20,35 @@ html, body, #root { height: 100%; }
 .rx-accent { color: #f28c2c; }            /* orange text */
 .rx-line { border-bottom: 1px solid #bbb; height: 18px; }
 .rx-small { font-size: 11px; }
+/* --- Admin sidebar palette (matches screenshot) --- */
+.admin-shell .sidebar {
+  background: #0b314e;    /* NAVY */
+  color: #ffffff;
+  border-right: 6px solid #e9772e; /* ORANGE accent strip */
+}
+
+.admin-shell .sidebar .nav-item {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 6px;
+  margin: 6px 8px;
+  color: #f5f9ff;
+}
+
+.admin-shell .sidebar .nav-item:hover {
+  background: rgba(255,255,255,0.10);
+}
+
+.admin-shell .sidebar .nav-item.active {
+  background: #e9772e;     /* ORANGE */
+  color: white;
+}
+
+/* Optional: make buttons with the navy/orange scheme consistent */
+.btn-navy {
+  background: #0b314e;
+  color: white;
+  border-radius: 9999px;
+  padding: 6px 12px;
+}
+.btn-navy:hover { filter: brightness(1.05); }

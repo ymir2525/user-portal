@@ -30,7 +30,6 @@ const sexDisplay = (sex) =>
 
 export default function AdminChartView() {
   const nav = useNavigate();
-  // Accept BOTH param styles so links from different places keep working
   const { recordId, patientId } = useParams();
   const effectiveRecordId = recordId ?? null;
   const effectivePatientId = patientId ?? null;
@@ -82,7 +81,6 @@ export default function AdminChartView() {
       setBanner(null);
 
       if (effectiveRecordId) {
-        // Load by patient_records.id (queue view flow)
         const { data, error } = await supabase
           .from("patient_records")
           .select(`
@@ -123,7 +121,6 @@ export default function AdminChartView() {
       }
 
       if (effectivePatientId) {
-        // Fallback: load directly from patients (old links)
         const { data, error } = await supabase
           .from("patients")
           .select(`
@@ -136,7 +133,7 @@ export default function AdminChartView() {
         if (error) throw error;
 
         const merged = {
-          record_id: null,
+          record_id: null, // <-- none yet (we will create it on save)
           patient_id: data.id,
           family_number: data.family_number ?? "",
           first_name: data.first_name ?? "",
@@ -161,13 +158,12 @@ export default function AdminChartView() {
         return;
       }
 
-      // Neither param present
       setBanner({ type: "err", msg: "Missing route parameter. No recordId or patientId provided." });
     } catch (e) {
       console.error(e);
       setBanner({ type: "err", msg: e.message || "Failed to load chart" });
     }
-  }, [effectiveRecordId, effectivePatientId, supabase]);
+  }, [effectiveRecordId, effectivePatientId]);
 
   /* ---------- load medicines from inventory (non-expired) ---------- */
   const loadMedicines = useCallback(async () => {
@@ -339,11 +335,51 @@ export default function AdminChartView() {
     }
   }
 
+  // ensure we have a patient_records row if opened via patientId
+  async function ensureRecordId() {
+    if (rec.record_id) return rec.record_id;
+
+    const insertPayload = {
+      patient_id: rec.patient_id,
+      visit_date: new Date().toISOString(),
+      queued: false,
+      status: "in_progress",
+      height_cm: rec.height_cm,
+      weight_kg: rec.weight_kg,
+      blood_pressure: rec.blood_pressure,
+      temperature_c: rec.temperature_c,
+      chief_complaint: rec.chief_complaint,
+    };
+
+    const { data, error } = await supabase
+      .from("patient_records")
+      .insert(insertPayload)
+      .select("id")
+      .single();
+
+    if (error) throw error;
+
+    setRec((prev) => ({ ...prev, record_id: data.id }));
+    return data.id;
+  }
+
+  // NEW: clear patient queue flags so they disappear from QueuingTable immediately
+  async function clearPatientQueueFlags(patient_id) {
+    if (!patient_id) return;
+    const { error } = await supabase
+      .from("patients")
+      .update({ queued: false, queued_at: null })
+      .eq("id", patient_id);
+    if (error) throw error;
+  }
+
   const saveChart = async () => {
     if (!rec) return;
     try {
       setSaving(true);
       setBanner(null);
+
+      const record_id = await ensureRecordId();
 
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess?.session?.user?.id;
@@ -353,13 +389,6 @@ export default function AdminChartView() {
       const combinedNotes =
         `Assessment / Diagnosis:\n${(docAssessment || "").trim()}\n\n` +
         `Management:\n${(docManagement || "").trim()}`;
-
-      // If we don’t have a record_id (opened by patientId), we can’t save back into patient_records
-      if (!rec.record_id) {
-        setBanner({ type: "err", msg: "This view was opened without a record. Open from the queue to save." });
-        setSaving(false);
-        return;
-      }
 
       const { error: upErr } = await supabase
         .from("patient_records")
@@ -373,12 +402,16 @@ export default function AdminChartView() {
           completed_at: new Date().toISOString(),
           queued: false,
         })
-        .eq("id", rec.record_id);
+        .eq("id", record_id);
       if (upErr) throw upErr;
 
-      await saveMedicinesDocument(rec.record_id);
+      // ALSO clear queue flags on patients
+      await clearPatientQueueFlags(rec.patient_id);
+
+      await saveMedicinesDocument(record_id);
       await decrementInventoryForDistributed(distributedList);
-      await logDispenseTransactions(distributedList, rec);
+      await logDispenseTransactions(distributedList, { ...rec, record_id });
+
       setBanner({ type: "ok", msg: "Chart saved. Inventory updated and medicines recorded." });
       nav("/admin/queue");
     } catch (e) {
@@ -399,7 +432,7 @@ export default function AdminChartView() {
     );
   }
 
-  async function logDispenseTransactions(items, rec) {
+  async function logDispenseTransactions(items, recCtx) {
     if (!items.length) return;
     const { data: sess } = await supabase.auth.getSession();
     const staff_id = sess?.session?.user?.id ?? null;
@@ -436,8 +469,8 @@ export default function AdminChartView() {
         medicine_name: it.name,
         dosage_form,
         quantity: Number(it.qty) || 0,
-        record_id: rec.record_id,
-        patient_id: rec.patient_id,
+        record_id: recCtx.record_id,
+        patient_id: recCtx.patient_id,
         staff_id,
         note: "Distributed via AdminChartView",
       });

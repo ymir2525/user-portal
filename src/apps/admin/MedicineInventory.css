@@ -140,3 +140,18 @@ body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; col
   display: flex; gap: 10px; justify-content: center;
   margin-top: 16px;
 }
+/* Add under your existing .btn styles */
+
+/* Red outline action like in your mockup */
+.btn.btn--red {
+  border: 2px solid #b42318;
+  color: #b42318;
+  background: #fff;
+}
+.btn.btn--red:hover:not([disabled]) {
+  background: #fee9e7;
+}
+
+/* Your modal body already has a border; default navy is fine. The remove modals
+   pass inline style borderColor:#b42318 to tint them red. */
+

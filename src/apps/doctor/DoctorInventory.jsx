@@ -1,7 +1,7 @@
 // src/apps/doctor/DoctorInventory.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
-// Reuse the existing styles from Admin. Adjust path if you moved the CSS.
+// Reuse the existing styles from Admin. Adjust path if needed.
 import "../admin/MedicineInventory.css";
 
 export default function DoctorInventory() {
@@ -9,11 +9,11 @@ export default function DoctorInventory() {
   const [inventory, setInventory] = useState([]);
   const [totals, setTotals] = useState({ stock: 0, distributed: 0 });
 
-  // catalog (classification -> medicine list) — used only for future doctor features
+  // catalog (classification -> medicine list) — currently read-only/for future doctor features
   const [catalog, setCatalog] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
 
-  // search
+  // search (stock tab)
   const [q, setQ] = useState("");
 
   const todayStr = useMemo(() => {
@@ -24,7 +24,31 @@ export default function DoctorInventory() {
     return `${y}-${m}-${day}`;
   }, []);
 
-  // loads
+  /* ---------- Dispense tab state ---------- */
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [dispenseRows, setDispenseRows] = useState([]);
+  const [distributedOnSelected, setDistributedOnSelected] = useState(0);
+  const MIN_DATE = "2000-01-01";
+  const MAX_DATE = todayStr;
+
+  /* ---------- Helpers (Manila day boundaries for Postgres timestamps) ---------- */
+  // Format Date to "YYYY-MM-DD HH:MM:SS" (UTC, no 'Z') for Postgres comparisons
+  function fmtPgTimestampUTC(d) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return (
+      `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}` +
+      ` ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
+    );
+  }
+  // Given a Manila date (YYYY-MM-DD), return UTC 'from' (inclusive) and 'to' (exclusive)
+  function manilaDayUtcRange(dateStr) {
+    const startManila = new Date(`${dateStr}T00:00:00+08:00`);
+    const nextManila = new Date(`${dateStr}T00:00:00+08:00`);
+    nextManila.setDate(nextManila.getDate() + 1);
+    return { from: fmtPgTimestampUTC(startManila), to: fmtPgTimestampUTC(nextManila) };
+  }
+
+  /* ---------- Loads ---------- */
   async function loadCatalog() {
     setLoadingCatalog(true);
     const { data, error } = await supabase
@@ -47,7 +71,7 @@ export default function DoctorInventory() {
   }
 
   async function loadTotals() {
-    // stock from inventory; distributed from transactions
+    // stock from inventory; distributed (lifetime) from transactions
     const [{ data: inv }, { data: tx, error: txErr }] = await Promise.all([
       supabase.from("medicine_inventory").select("quantity, expiration_date"),
       supabase.from("medicine_transactions").select("quantity, direction"),
@@ -65,10 +89,65 @@ export default function DoctorInventory() {
     setTotals({ stock, distributed });
   }
 
+  // Load dispense transactions for the selected Manila day, enriched with patient info
+  async function loadDispenseFor(dateStr) {
+    const { from, to } = manilaDayUtcRange(dateStr);
+
+    // 1) get transactions for the day
+    const { data: tx, error } = await supabase
+      .from("medicine_transactions")
+      .select(
+        "id, created_at, direction, classification, medicine_name, dosage_form, quantity, patient_id"
+      )
+      .eq("direction", "out")
+      .gte("created_at", from)
+      .lt("created_at", to)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Dispense fetch failed:", error.message, error.details || "");
+      setDispenseRows([]);
+      setDistributedOnSelected(0);
+      return;
+    }
+
+    const rows = tx || [];
+
+    // 2) look up patient info for any patient_ids we have
+    const ids = Array.from(new Set(rows.map((r) => r.patient_id).filter(Boolean)));
+    let byPatient = new Map();
+    if (ids.length) {
+      const { data: pats, error: pErr } = await supabase
+        .from("patients")
+        .select("id, family_number, first_name, middle_name, surname")
+        .in("id", ids);
+      if (!pErr && pats) {
+        byPatient = new Map(pats.map((p) => [p.id, p]));
+      }
+    }
+
+    // 3) enrich rows for rendering
+    const enriched = rows.map((r) => {
+      const p = r.patient_id ? byPatient.get(r.patient_id) : null;
+      const patient_name = p
+        ? [p.first_name, p.middle_name, p.surname].filter(Boolean).join(" ")
+        : "—";
+      const family_number = p?.family_number || "—";
+      return { ...r, patient_name, family_number };
+    });
+
+    setDispenseRows(enriched);
+    setDistributedOnSelected(
+      enriched.reduce((s, r) => s + (Number(r.quantity) || 0), 0)
+    );
+  }
+
+  /* ---------- Effects (initial + realtime) ---------- */
   useEffect(() => {
     loadCatalog();
     loadInventory();
     loadTotals();
+    loadDispenseFor(selectedDate);
 
     // realtime (read-only listeners for doctor)
     const invCh = supabase
@@ -88,7 +167,10 @@ export default function DoctorInventory() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "medicine_transactions" },
-        loadTotals
+        () => {
+          loadTotals();
+          loadDispenseFor(selectedDate); // keep the current pick fresh
+        }
       )
       .subscribe();
 
@@ -106,9 +188,10 @@ export default function DoctorInventory() {
       supabase.removeChannel(txCh);
       supabase.removeChannel(catCh);
     };
-  }, [todayStr]);
+    // include selectedDate so realtime refresh respects current day
+  }, [todayStr, selectedDate]);
 
-  // search filter
+  /* ---------- Search filter (stock tab) ---------- */
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return inventory;
@@ -216,12 +299,81 @@ export default function DoctorInventory() {
       )}
 
       {tab === "dispense" && (
-        <div className="card">
-          <h4 className="card__title">Dispense List</h4>
-          <div className="muted small">
-            Coming next (read-only history of “out” transactions per patient).
+        <>
+          {/* Metrics (distributed reflects selected date) */}
+          <div className="mi-metrics">
+            <div className="mi-metric">
+              <div className="mi-metric__label">Total Medicine in Stock</div>
+              <div className="mi-metric__value">{totals.stock}</div>
+            </div>
+            <div className="mi-metric">
+              <div className="mi-metric__label">
+                Total Medicine Distributed (Selected Day)
+              </div>
+              <div className="mi-metric__value">{distributedOnSelected}</div>
+            </div>
+
+            {/* Date picker */}
+            <div className="mi-actions" style={{ gap: 8 }}>
+              <div className="field" style={{ margin: 0 }}>
+                <label className="label">Select Day</label>
+                <input
+                  type="date"
+                  className="input"
+                  min={MIN_DATE}
+                  max={MAX_DATE}
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* Dispense table */}
+          <div className="card">
+            <h4 className="card__title">
+              Dispense List — {new Date(selectedDate).toLocaleDateString()}
+            </h4>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Patient Name</th>
+                    <th>Family Number</th>
+                    <th>Medicine</th>
+                    <th>Type</th>
+                    <th>Number of Medicine</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dispenseRows.length ? (
+                    dispenseRows.map((row, i) => (
+                      <tr key={row.id} className={i % 2 ? "is-even" : "is-odd"}>
+                        <td>{row.patient_name || "—"}</td>
+                        <td>{row.family_number || "—"}</td>
+                        <td>{row.medicine_name || "—"}</td>
+                        <td>{row.dosage_form || "—"}</td>
+                        <td>{row.quantity}</td>
+                        <td>
+                          {row.created_at
+                            ? new Date(row.created_at).toLocaleTimeString()
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="table-empty">
+                        No dispense records for this day.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </section>
   );

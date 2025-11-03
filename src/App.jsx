@@ -6,19 +6,27 @@ import RequireAuth from "./routes/RequireAuth";
 import BhwDashboard from "./apps/BhwDashboard";
 import BhwFamily from "./apps/BhwFamily";
 import AdminApp from "./apps/admin/AdminApp";
-import NurseDashboard from "./apps/nurse/NurseDashboard";
 
-// Doctor (new layout + pages)
+// Nurse
+import NurseDashboard from "./apps/nurse/NurseDashboard";
+import NurseDashboardLayout from "./apps/nurse/NurseDashboardLayout";
+import NurseQueueList from "./apps/nurse/NurseQueueList";
+import NurseQueueChartView from "./apps/nurse/NurseQueueChartView";
+import NursePatientRecords from "./apps/nurse/NursePatientRecords";
+import NurseFamily from "./apps/nurse/NurseFamily";
+import NurseInventory from "./apps/nurse/NurseInventory";
+import NurseDayHistory from "./apps/nurse/NurseDayHistory"; // <-- ADD THIS
+
+// Doctor
 import DoctorDashboard from "./apps/doctor/DoctorDashboard";
 import DoctorDashboardHome from "./apps/doctor/DoctorDashboardHome";
 import DoctorQueueList from "./apps/doctor/DoctorQueueList";
 import DoctorQueueChart from "./apps/doctor/DoctorQueueChart";
-
 import DoctorInventory from "./apps/doctor/DoctorInventory";
-// NEW: doctor versions of Patient list + Family
 import DoctorPatients from "./apps/doctor/DoctorPatients";
 import DoctorFamily from "./apps/doctor/DoctorFamily";
 
+// BHW
 import BhwQueueList from "./apps/bhw/BhwQueueList";
 import BhwQueueChart from "./apps/bhw/BhwQueueChart";
 
@@ -32,7 +40,7 @@ export default function App() {
         {/* Public */}
         <Route path="/login" element={<Login />} />
 
-        {/* Protected: BHW (enum value is exactly 'BHW') */}
+        {/* BHW */}
         <Route
           path="/bhw"
           element={
@@ -66,7 +74,7 @@ export default function App() {
           }
         />
 
-        {/* Protected: Doctor (enum value is 'Doctor') */}
+        {/* Doctor */}
         <Route
           path="/doctor/*"
           element={
@@ -75,49 +83,35 @@ export default function App() {
             </RequireAuth>
           }
         >
-          {/* Renders inside <Outlet/> of DoctorDashboard */}
           <Route index element={<DoctorDashboardHome />} />
           <Route path="queue" element={<DoctorQueueList />} />
           <Route path="queue/:recordId" element={<DoctorQueueChart />} />
-
-          {/* NEW: real Patients list + Family detail for Doctor */}
           <Route path="patients" element={<DoctorPatients />} />
           <Route path="family/:familyNumber" element={<DoctorFamily />} />
-
-         <Route path="inventory" element={<DoctorInventory />} />
+          <Route path="inventory" element={<DoctorInventory />} />
         </Route>
 
-        {/* Protected: Nurse */}
+        {/* Nurse */}
         <Route
-          path="/nurse"
+          path="/nurse/*"
           element={
             <RequireAuth role="Nurse">
-              <NurseDashboard />
+              <NurseDashboardLayout />
             </RequireAuth>
           }
-        />
+        >
+          <Route index element={<NurseDashboard />} />
+          <Route path="queue" element={<NurseQueueList />} />
+          <Route path="queue/:recordId" element={<NurseQueueChartView />} />
+          <Route path="patients" element={<NursePatientRecords />} />
+          <Route path="family/:familyNumber" element={<NurseFamily />} />
+          <Route path="inventory" element={<NurseInventory />} />
+          <Route path="history" element={<NurseDayHistory />} /> {/* <-- USE IT */}
+            {/* NEW: view chart from Day History without switching sidebar tab */}
+         <Route path="history/view/:recordId" element={<NurseQueueChartView />} />
+        </Route>
 
-        {/* Protected: Admin */}
-        <Route
-          path="/admin/*"
-          element={
-            <RequireAuth role="Admin">
-              <AdminApp />
-            </RequireAuth>
-          }
-        />
-
-        {/* Protected: Nurse (enum value is 'Nurse') */}
-        <Route
-          path="/nurse"
-          element={
-            <RequireAuth role="Nurse">
-              <NurseDashboard />
-            </RequireAuth>
-          }
-        />
-
-        {/* Protected: Admin (enum value is 'Admin', not 'ADMIN') */}
+        {/* Admin */}
         <Route
           path="/admin/*"
           element={

@@ -1,6 +1,6 @@
 // src/apps/admin/AdminApp.jsx
 import React, { useState } from "react";
-import { NavLink, Routes, Route, Navigate } from "react-router-dom";
+import { NavLink, Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 
 import AccountManagement from "./AccountManagement";
@@ -12,6 +12,7 @@ import AdminDayHistory from "./AdminDayHistory";
 import AdminPatientRecords from "./AdminPatientRecords";
 import AdminChartView from "./AdminChartView";
 import AdminFamily from "./AdminFamily"; // <-- NEW
+import NurseQueueChartView from "../nurse/NurseQueueChartView"; // <-- reuse read-only chart
 
 const ORANGE   = "#e9772e";
 const PEACH    = "#f3b184";
@@ -35,6 +36,12 @@ export default function AdminApp() {
     } catch {}
     window.location.replace("/login");
   };
+
+  // Keep Day History highlighted when viewing a record ("/admin/record/:recordId")
+  const loc = useLocation();
+  const isDayHistoryContext =
+    loc.pathname.startsWith("/admin/day-history") ||
+    loc.pathname.startsWith("/admin/record/");
 
   return (
     <div className="flex flex-col h-screen" style={{ backgroundColor: PEACH_BG }}>
@@ -67,66 +74,93 @@ export default function AdminApp() {
           </h2>
 
           <nav className="space-y-2">
-            <NavLink to="/admin/dashboard" className={({isActive}) =>
-              `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-            } style={({isActive}) => ({
-              backgroundColor: isActive ? ORANGE : "#ffffff",
-              borderColor: isActive ? ORANGE : PEACH,
-            })}>
+            <NavLink
+              to="/admin/dashboard"
+              className={({isActive}) =>
+                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+              }
+              style={({isActive}) => ({
+                backgroundColor: isActive ? ORANGE : "#ffffff",
+                borderColor: isActive ? ORANGE : PEACH,
+              })}
+            >
               Dashboard
             </NavLink>
 
-            <NavLink to="/admin/queue" className={({isActive}) =>
-              `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-            } style={({isActive}) => ({
-              backgroundColor: isActive ? ORANGE : "#ffffff",
-              borderColor: isActive ? ORANGE : PEACH,
-            })}>
+            <NavLink
+              to="/admin/queue"
+              className={({isActive}) =>
+                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+              }
+              style={({isActive}) => ({
+                backgroundColor: isActive ? ORANGE : "#ffffff",
+                borderColor: isActive ? ORANGE : PEACH,
+              })}
+            >
               Queuing Table
             </NavLink>
 
-            <NavLink to="/admin/records" className={({isActive}) =>
-              `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-            } style={({isActive}) => ({
-              backgroundColor: isActive ? ORANGE : "#ffffff",
-              borderColor: isActive ? ORANGE : PEACH,
-            })}>
+            <NavLink
+              to="/admin/records"
+              className={({isActive}) =>
+                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+              }
+              style={({isActive}) => ({
+                backgroundColor: isActive ? ORANGE : "#ffffff",
+                borderColor: isActive ? ORANGE : PEACH,
+              })}
+            >
               Patient Records
             </NavLink>
 
-            <NavLink to="/admin/inventory" className={({isActive}) =>
-              `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-            } style={({isActive}) => ({
-              backgroundColor: isActive ? ORANGE : "#ffffff",
-              borderColor: isActive ? ORANGE : PEACH,
-            })}>
+            <NavLink
+              to="/admin/inventory"
+              className={({isActive}) =>
+                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+              }
+              style={({isActive}) => ({
+                backgroundColor: isActive ? ORANGE : "#ffffff",
+                borderColor: isActive ? ORANGE : PEACH,
+              })}
+            >
               Medicine Inventory
             </NavLink>
 
-            <NavLink to="/admin/archive" className={({isActive}) =>
-              `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-            } style={({isActive}) => ({
-              backgroundColor: isActive ? ORANGE : "#ffffff",
-              borderColor: isActive ? ORANGE : PEACH,
-            })}>
-              Archive
-            </NavLink>
+            {/* Day History tab (active for /admin/day-history AND /admin/record/...) */}
+            <Link
+              to="/admin/day-history"
+              className={`w-full block px-3 py-2 border rounded-lg ${isDayHistoryContext ? "text-white" : "text-gray-800"}`}
+              style={{
+                backgroundColor: isDayHistoryContext ? ORANGE : "#ffffff",
+                borderColor: isDayHistoryContext ? ORANGE : PEACH,
+              }}
+            >
+              Day History
+            </Link>
 
-            <NavLink to="/admin/analytics" className={({isActive}) =>
-              `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-            } style={({isActive}) => ({
-              backgroundColor: isActive ? ORANGE : "#ffffff",
-              borderColor: isActive ? ORANGE : PEACH,
-            })}>
+            <NavLink
+              to="/admin/analytics"
+              className={({isActive}) =>
+                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+              }
+              style={({isActive}) => ({
+                backgroundColor: isActive ? ORANGE : "#ffffff",
+                borderColor: isActive ? ORANGE : PEACH,
+              })}
+            >
               Data Analytics
             </NavLink>
 
-            <NavLink to="/admin/accounts" className={({isActive}) =>
-              `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-            } style={({isActive}) => ({
-              backgroundColor: isActive ? ORANGE : "#ffffff",
-              borderColor: isActive ? ORANGE : PEACH,
-            })}>
+            <NavLink
+              to="/admin/accounts"
+              className={({isActive}) =>
+                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
+              }
+              style={({isActive}) => ({
+                backgroundColor: isActive ? ORANGE : "#ffffff",
+                borderColor: isActive ? ORANGE : PEACH,
+              })}
+            >
               Account Management
             </NavLink>
           </nav>
@@ -141,11 +175,15 @@ export default function AdminApp() {
             <Route path="records" element={<AdminPatientRecords />} />
             <Route path="family/:familyNumber" element={<AdminFamily />} /> {/* NEW */}
             <Route path="inventory" element={<MedicineInventory flash={flash} />} />
-           <Route path="day-history" element={<AdminDayHistory />} />
-           {/* optional compatibility alias if old links exist: */}
-           <Route path="archive" element={<Navigate to="/admin/day-history" replace />} />
+            <Route path="day-history" element={<AdminDayHistory />} />
+            {/* alias for any old links */}
+            <Route path="archive" element={<Navigate to="/admin/day-history" replace />} />
             <Route path="analytics" element={<DataAnalytics />} />
             <Route path="accounts" element={<AccountManagement flash={flash} />} />
+
+            {/* NEW: read-only chart view by recordId (same as Nurse) */}
+            <Route path="record/:recordId" element={<NurseQueueChartView />} />
+
             <Route path="*" element={<div>Admin Page Not Found</div>} />
           </Routes>
 

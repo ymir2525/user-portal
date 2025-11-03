@@ -1,4 +1,4 @@
-// src/apps/admin/AdminDayHistory.jsx
+// src/apps/nurse/NurseDayHistory.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useNavigate } from "react-router-dom"; // ✅ ADD
@@ -59,12 +59,12 @@ const summarizeMeds = (txns) => {
 };
 
 /* ----------------- component ----------------- */
-export default function AdminDayHistory() {
+export default function NurseDayHistory() {
   const [selectedDate, setSelectedDate] = useState(todayPH);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [records, setRecords] = useState([]); // [{record, patient, meds[]}]
-  const nav = useNavigate(); // ✅
+  const nav = useNavigate(); // ✅ ADD
 
   const dateFilter = useMemo(() => {
     if (!selectedDate) return todayPH();
@@ -82,7 +82,7 @@ export default function AdminDayHistory() {
       setLoading(true);
       setErr("");
       try {
-        // 1) Completed charts only (exclude queued)
+        // 1) Fetch patient records for the day (this is your "chart saved" count)
         const { data: recs, error: recErr } = await supabase
           .from("patient_records")
           .select(
@@ -102,7 +102,7 @@ export default function AdminDayHistory() {
           `
           )
           .eq("visit_date", dateFilter)
-          .eq("status", "completed") // ✅ only saved charts
+          .eq("status", "completed")   // ✅ show only saved/completed charts
           .order("created_at", { ascending: true });
 
         if (recErr) throw recErr;
@@ -110,7 +110,7 @@ export default function AdminDayHistory() {
         let medByRecord = new Map();
 
         if (recordIds.length > 0) {
-          // 2) Med transactions for those records
+          // 2) Fetch medicine "out" transactions for those records (same date window)
           const { data: meds, error: medErr } = await supabase
             .from("medicine_transactions")
             .select("record_id, medicine_name, dosage_form, quantity, direction, created_at")
@@ -218,14 +218,14 @@ export default function AdminDayHistory() {
                   </div>
                 </div>
 
-                {/* View Chart -> same read-only view as Nurse, by recordId */}
+                {/* View Chart (enabled) */}
                 <button
                   type="button"
                   className="px-3 py-1.5 text-sm border rounded-md border-orange-300 text-orange-700 hover:bg-orange-50"
                   title="View this saved chart"
                   onClick={() =>
-                    nav(`/admin/record/${record.id}`, { state: { from: "/admin/day-history" } })
-                  }
+   nav(`/nurse/history/view/${record.id}`, { state: { from: "/nurse/history" } })
+ }
                 >
                   View Chart
                 </button>
