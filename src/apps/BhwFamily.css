@@ -220,7 +220,7 @@ body { margin:0; }
 /* Checkbox */
 .checkbox{ display:flex; align-items:center; gap:8px; font-size:14px; margin-top:8px; }
 .checkbox-input{ accent-color: var(--orange-500); }
-.checkbox-label{}
+
 
 /* ------------------------------
    Buttons
