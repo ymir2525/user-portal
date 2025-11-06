@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { NavLink, Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
+import "./AdminApp.css";
 
 import AccountManagement from "./AccountManagement";
 import DataAnalytics from "./DataAnalytics";
@@ -13,11 +14,6 @@ import AdminPatientRecords from "./AdminPatientRecords";
 import AdminChartView from "./AdminChartView";
 import AdminFamily from "./AdminFamily"; // <-- NEW
 import NurseQueueChartView from "../nurse/NurseQueueChartView"; // <-- reuse read-only chart
-
-const ORANGE   = "#e9772e";
-const PEACH    = "#f3b184";
-const PEACH_BG = "#fde6d3";
-const PANEL_BG = "#fff7f1";
 
 export default function AdminApp() {
   const [toast, setToast] = useState(null);
@@ -44,19 +40,19 @@ export default function AdminApp() {
     loc.pathname.startsWith("/admin/record/");
 
   return (
-    <div className="flex flex-col h-screen" style={{ backgroundColor: PEACH_BG }}>
-      <header className="w-full px-6 py-3 text-white shrink-0" style={{ backgroundColor: ORANGE }}>
-        <div className="flex items-center justify-between">
+    <div className="admin-app">
+      <header className="admin-header">
+        <div className="admin-header-row">
           <div className="font-semibold">Caybiga Health Center — Admin</div>
 
           <button
             onClick={handleLogout}
             disabled={loggingOut}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-60"
+            className="logout-btn"
             aria-label="Log out"
             title="Log out"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3M16 17l5-5-5-5M21 12H9"/>
             </svg>
             {loggingOut ? "Signing out..." : "Log Out"}
@@ -64,64 +60,35 @@ export default function AdminApp() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside
-          className="self-stretch w-64 h-full p-4 overflow-y-auto border-r"
-          style={{ backgroundColor: PANEL_BG, borderColor: PEACH }}
-        >
-          <h2 className="mb-4 font-semibold" style={{ color: ORANGE }}>
-            Admin Dashboard
-          </h2>
+      <div className="admin-body">
+        <aside className="admin-sidebar">
+          <h2>Admin Dashboard</h2>
 
-          <nav className="space-y-2">
+          <nav className="admin-nav">
             <NavLink
               to="/admin/dashboard"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
+              className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
             >
               Dashboard
             </NavLink>
 
             <NavLink
               to="/admin/queue"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
+              className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
             >
               Queuing Table
             </NavLink>
 
             <NavLink
               to="/admin/records"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
+              className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
             >
               Patient Records
             </NavLink>
 
             <NavLink
               to="/admin/inventory"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
+              className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
             >
               Medicine Inventory
             </NavLink>
@@ -129,44 +96,28 @@ export default function AdminApp() {
             {/* Day History tab (active for /admin/day-history AND /admin/record/...) */}
             <Link
               to="/admin/day-history"
-              className={`w-full block px-3 py-2 border rounded-lg ${isDayHistoryContext ? "text-white" : "text-gray-800"}`}
-              style={{
-                backgroundColor: isDayHistoryContext ? ORANGE : "#ffffff",
-                borderColor: isDayHistoryContext ? ORANGE : PEACH,
-              }}
+              className={`nav-link ${isDayHistoryContext ? "active" : ""}`}
             >
               Day History
             </Link>
 
             <NavLink
               to="/admin/analytics"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
+              className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
             >
               Data Analytics
             </NavLink>
 
             <NavLink
               to="/admin/accounts"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
+              className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
             >
               Account Management
             </NavLink>
           </nav>
         </aside>
 
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="admin-main">
           <Routes>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
@@ -188,10 +139,7 @@ export default function AdminApp() {
           </Routes>
 
           {toast && (
-            <div
-              className="fixed bottom-4 right-4 px-3 py-2 rounded text-white"
-              style={{ backgroundColor: toast.type === "error" ? "#dc2626" : "#16a34a" }}
-            >
+            <div className={`toast ${toast.type === "error" ? "error" : ""}`}>
               {toast.msg}
             </div>
           )}

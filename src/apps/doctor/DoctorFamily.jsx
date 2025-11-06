@@ -31,7 +31,7 @@ export default function DoctorFamily() {
         .from("profiles").select("role").eq("id", uid).single();
 
       if (profErr || !prof || String(prof.role).toUpperCase() !== "DOCTOR") {
-        await supabase.auth.signOut().catch(()=>{});
+        await supabase.auth.signOut().catch(()=>{}); 
         nav("/login", { replace: true }); return;
       }
 
@@ -67,7 +67,7 @@ export default function DoctorFamily() {
     try {
       setLoading(true); setErr("");
 
-      const [{ data: p, error: e1 }, { data: recs, error: e2 }] = await Promise.all([
+      const [{ data: p, error: e1 }, { data: recs, error: e2 }] = await Promise.all([ 
         supabase.from("patients").select("*").eq("id", patientId).single(),
         supabase.from("patient_records")
           .select("*")
@@ -105,10 +105,10 @@ export default function DoctorFamily() {
 
   return (
     <div className="family-page">
-      <h2 className="page-title page-title--family">Family: {familyNumber}</h2>
+      <h2 className="page-title">Family: {familyNumber}</h2>
 
       {loading && <div className="status status--loading">Loading…</div>}
-      {err && <div className="error-text text-center">{err}</div>}
+      {err && <div className="error-text">{err}</div>}
 
       {!loading && !err && (
         <>
@@ -142,14 +142,12 @@ export default function DoctorFamily() {
 
           {patient && (
             <div className="patient-wrap">
-              {/* header (NO "+ New Record" button for doctor) */}
               <div className="patient-head">
                 <div className="patient-name">
                   {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
                 </div>
               </div>
 
-              {/* Meta summary */}
               <div className="patient-meta">
                 <div><strong>Birthdate:</strong> {dateOnly(patient.birthdate) || "—"}</div>
                 <div><strong>Age:</strong> {computedAge || "—"} yrs old</div>
@@ -157,16 +155,15 @@ export default function DoctorFamily() {
                 <div><strong>Contact Number:</strong> {patient.contact_number || "—"}</div>
                 <div><strong>Address:</strong> {patient.address || "—"}</div>
                 <div className="patient-emergency">
-                  <strong>Contact Person:</strong> {patient.emergency_contact_name || "—"}
-                  {" "} | <strong>Contact Number:</strong> {patient.contact_person || "—"}
-                  {" "} | <strong>Relation:</strong> {patient.emergency_relation || "—"}
+                  <strong>Contact Person:</strong> {patient.emergency_contact_name || "—"} | 
+                  <strong> Contact Number:</strong> {patient.contact_person || "—"} | 
+                  <strong> Relation:</strong> {patient.emergency_relation || "—"}
                 </div>
                 <div className="patient-right">
                   <strong>Fam {patient.family_number || "—"}</strong>
                 </div>
               </div>
 
-              {/* Past Records (click -> auto Chart view) */}
               {pastView === "list" && (
                 <>
                   <div className="subhead">Past Records</div>
@@ -184,14 +181,13 @@ export default function DoctorFamily() {
                           {dateOnly(r.completed_at || r.visit_date || r.created_at)}
                         </div>
                         <div className="record-item__meta">
-                          H: {r.height_cm ?? "—"} cm • W: {r.weight_kg ?? "—"} kg • BP: {r.blood_pressure ?? "—"} •
-                          Temp: {r.temperature_c ?? "—"} °C • CC: {r.chief_complaint || "—"}
+                          H: {r.height_cm ?? "—"} cm • W: {r.weight_kg ?? "—"} kg • BP: {r.blood_pressure ?? "—"} • Temp: {r.temperature_c ?? "—"} °C • CC: {r.chief_complaint || "—"}
                         </div>
                       </button>
                     ))}
                   </div>
 
-                  <div className="actions actions--back">
+                  <div className="actions">
                     <button
                       onClick={() => { setPatient(null); setSelectedPast(null); setPastView("list"); }}
                       className="btn btn--primary"
@@ -217,14 +213,12 @@ export default function DoctorFamily() {
   );
 }
 
-/* ---------- Auto-open Chart view (includes Document Request + PDF Download) ---------- */
 function PastChartViewLite({ rec, patient, onBack }) {
   const printRef = useRef(null);
   const [docs, setDocs] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [docsErr, setDocsErr] = useState("");
 
-  // load documents for the record (shown under chart)
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -247,7 +241,6 @@ function PastChartViewLite({ rec, patient, onBack }) {
   }, [rec.id]);
 
   const downloadAsPDF = () => {
-    // Simple, dependency-free approach using the browser print-to-PDF
     const node = printRef.current;
     if (!node) return;
 
@@ -256,20 +249,15 @@ function PastChartViewLite({ rec, patient, onBack }) {
 
     const style = `
       <style>
-        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 16px; }
+        body { font-family: system-ui, sans-serif; padding: 16px; }
         h1,h2,h3 { margin: 0 0 8px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
-        .card__title { font-weight: 600; margin-bottom: 6px; }
-        .muted { color: #6b7280; }
         .doc-row { display:flex; justify-content: space-between; border-top: 1px dashed #e5e7eb; padding: 8px 0; }
-        .doc-row:first-child { border-top: 0; }
       </style>
     `;
-
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Chart</title>${style}</head><body>${node.innerHTML}</body></html>`);
     win.document.close();
-    // Give the new doc a tick to render before printing
     win.focus();
     setTimeout(() => { win.print(); win.close(); }, 150);
   };
@@ -282,15 +270,13 @@ function PastChartViewLite({ rec, patient, onBack }) {
       </div>
 
       <div ref={printRef}>
-        {/* Header details inside printable area */}
         <div className="past-meta" style={{ marginBottom: 12 }}>
           <div><strong>Patient Name:</strong> {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}</div>
-            <div><strong>Address:</strong> {patient.address || "—"}</div> {/* ← add this */}
           <div><strong>Doctor in Charge:</strong> {rec.doctor_full_name || "—"}</div>
           <div><strong>Date:</strong> {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</div>
         </div>
 
-        <div className="grid grid--two">
+        <div className="grid">
           <div className="card">
             <div className="card__title">Nurse Vitals</div>
             <div>Height: {rec.height_cm ?? "—"} cm</div>
@@ -306,24 +292,17 @@ function PastChartViewLite({ rec, patient, onBack }) {
           </div>
         </div>
 
-        {/* Document Request section lives WITHIN the Chart view now */}
         <div className="card" style={{ marginTop: 16 }}>
           <div className="card__title">Document Request</div>
-          {loadingDocs && <div className="status status--loading">Loading…</div>}
+          {loadingDocs && <div className="status">Loading…</div>}
           {docsErr && <div className="error-text">{docsErr}</div>}
           {!loadingDocs && !docsErr && (
             <div>
               {docs.length === 0 && <div className="muted">No documents saved for this record.</div>}
               {docs.map(d => (
                 <div key={d.id} className="doc-row">
-                  <div>
-                    {d.type} <span className="doc-row__meta">• {new Date(d.created_at).toLocaleString()}</span>
-                  </div>
-                  <div>
-                    {d.url
-                      ? <a className="link" href={d.url} target="_blank" rel="noreferrer">open file</a>
-                      : "no file URL"}
-                  </div>
+                  <div>{d.type} <span className="doc-row__meta">• {new Date(d.created_at).toLocaleString()}</span></div>
+                  <div>{d.url ? <a className="link" href={d.url} target="_blank" rel="noreferrer">open file</a> : "no file URL"}</div>
                 </div>
               ))}
             </div>
@@ -331,21 +310,10 @@ function PastChartViewLite({ rec, patient, onBack }) {
         </div>
       </div>
 
-      {/* Actions under printable area */}
       <div className="past-actions" style={{ marginTop: 12 }}>
-        <button
-        onClick={downloadAsPDF}
-        className="btn btn--accent-block"
-        style={{
-          border: '2px solid #22c55e',
-          color: '#16a34a',
-          background: '#ffffff',
-          borderRadius: 12,
-          fontWeight: 600
-        }}
-      >
-        Download Chart (PDF)
-      </button>
+        <button onClick={downloadAsPDF} className="btn btn--accent-block">
+          Download Chart (PDF)
+        </button>
       </div>
     </div>
   );

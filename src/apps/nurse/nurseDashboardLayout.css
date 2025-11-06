@@ -1,0 +1,76 @@
+/* General Layout */
+.nursedash {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-header {
+  background-color: #0b314e;
+  color: white;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.app-header__title {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.link--small {
+  font-size: 0.875rem;
+  color: white;
+  text-decoration: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.link--small:hover {
+  text-decoration: underline;
+}
+
+/* Sidebar Styles */
+.sidebar {
+  background-color: #fff7f1;
+  border-right: 1px solid #cbd5e1;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-top: 20px;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nav__item {
+  padding: 10px 16px;
+  font-size: 1rem;
+  color: #333;
+  text-decoration: none;
+  display: block;
+}
+
+.nav__item:hover {
+  background-color: #e0e7ff;
+  color: #0b314e;
+}
+
+.nav__item--active {
+  background-color: #e9772e;
+  color: white;
+  font-weight: bold;
+}
+/* Main Content */
+.main {
+  flex-grow: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background-color: #f9fafb;
+}

@@ -100,3 +100,317 @@ body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif
   background: var(--orange-600) !important;
   border-color: var(--orange-600) !important;
 }
+
+
+/* Basic styles for layout */
+.family-page {
+  padding: 20px;
+}
+
+.page-title {
+  font-size: 2em;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.status--loading {
+  text-align: center;
+}
+
+.error-text {
+  color: red;
+  text-align: center;
+  font-size: 1.2em;
+}
+
+/* Member list */
+.member-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.member-card {
+  background-color: #f9f9f9;
+  border: 2px solid #ddd;
+  padding: 15px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+}
+
+.member-card__row {
+  display: flex;
+  flex-direction: column;
+}
+
+.member-card__name {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+.member-card__meta {
+  font-size: 0.9em;
+  color: #555;
+}
+
+.member-card__date {
+  font-size: 0.8em;
+  color: #888;
+}
+
+/* Patient Details */
+.patient-wrap {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  border: 2px solid #ddd;
+}
+
+.patient-head {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+.patient-meta {
+  margin-bottom: 20px;
+}
+
+.patient-emergency {
+  font-size: 0.9em;
+  color: #555;
+}
+
+.patient-right {
+  font-size: 1.1em;
+  font-weight: bold;
+  text-align: right;
+}
+
+.subhead {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+/* Past Records */
+.record-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.record-item {
+  background-color: #f9f9f9;
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.record-item__title {
+  font-weight: bold;
+}
+
+.record-item__meta {
+  font-size: 0.9em;
+  color: #666;
+}
+
+/* Past Chart */
+.past {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  border: 2px solid #ddd;
+}
+
+.past-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.past-meta {
+  margin-bottom: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.card {
+  padding: 15px;
+  background-color: #f1f1f1;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+}
+
+.card__title {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.prewrap {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.muted {
+  color: #777;
+}
+
+.doc-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px dashed #ddd;
+}
+
+.card__title {
+  font-weight: bold;
+}
+
+.past-actions {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.btn--primary {
+  background-color: #007bff;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+.btn--light {
+  background-color: #f1f1f1;
+  padding: 10px 20px;
+  border-radius: 10px;
+}
+
+.btn--accent-block {
+  background-color: #22c55e;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+.link {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.error-text {
+  color: red;
+  font-size: 1.1em;
+}
+
+/* Layout and Container Styles */
+.queue-list-container {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+/* Banner Styles */
+.banner {
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+.banner--ok {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.banner--err {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Queue List Styles */
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.queue-card {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px;
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.queue-card__left {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-card__name {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.queue-card__meta {
+  font-size: 14px;
+  color: #666;
+}
+
+.queue-card__right {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Button Styles */
+.btn {
+  padding: 8px 16px;
+  background-color: #f1f1f1;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn--outline {
+  background-color: transparent;
+  border-color: #333;
+}
+
+.btn--primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn--outline:hover,
+.btn--primary:hover {
+  opacity: 0.8;
+}
+
+/* No Patients Found */
+.muted {
+  color: #888;
+}
+
+.small {
+  font-size: 14px;
+}
+
+

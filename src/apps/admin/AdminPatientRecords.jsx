@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import "../doctor/doctorDash.css"; // reuse the same light styles as Doctor
+import "./AdminPatientRecords.css"; // Link to the new CSS file
 
 export default function AdminPatientRecords() {
   const nav = useNavigate();
@@ -85,9 +85,9 @@ export default function AdminPatientRecords() {
     <section className="section section--records">
       <h2 className="section-title">Patient Records</h2>
 
-      <div className="toolbar" style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 8 }}>
+      <div className="toolbar">
         <input
-          className="input input--search"
+          className="input--search"
           placeholder="Search by Family No. or Surname..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -116,7 +116,6 @@ export default function AdminPatientRecords() {
         >
           {loading ? "Loading..." : "Refresh"}
         </button>
-        <div />
       </div>
 
       {err && <div className="alert alert--error">{err}</div>}

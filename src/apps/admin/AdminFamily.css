@@ -1,0 +1,268 @@
+:root {
+  --orange-800: #e9772e;
+  --orange-900: #e15252;
+  --gray-600: #4b5563;
+  --slate-200: #e5e7eb;
+  --slate-900: #1f2937;
+  --red-50: #fee2e2;
+  --red-200: #fca5a5;
+  --orange-50: #fef3c7;
+  --orange-200: #f9d3a0;
+}
+
+/* Max-width container */
+.family-page {
+  max-width: 50rem; /* 5xl */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Page Title */
+.page-title--family {
+  font-size: 1.5rem; /* text-2xl */
+  font-weight: 600; /* font-semibold */
+  color: var(--orange-800);
+  margin-bottom: 1rem;
+}
+
+/* Status indicators */
+.status--loading {
+  font-size: 1rem; /* text-lg */
+  color: var(--orange-800);
+}
+
+.error-text {
+  color: var(--red-700);
+  background-color: var(--red-50);
+  border: 1px solid var(--red-200);
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  text-align: center;
+  font-size: 0.875rem; /* text-sm */
+  margin-bottom: 1rem;
+}
+
+/* Member list */
+.member-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.member-card {
+  display: block;
+  background-color: white;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--slate-200);
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.member-card:hover {
+  background-color: var(--orange-50);
+}
+
+.member-card__row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.member-card__main {
+  font-size: 1rem; /* text-base */
+  color: var(--slate-900);
+}
+
+.member-card__name {
+  font-weight: 600; /* font-semibold */
+}
+
+.member-card__meta {
+  font-size: 0.875rem; /* text-sm */
+  color: var(--gray-600);
+}
+
+.member-card__date {
+  font-size: 0.75rem; /* text-xs */
+  color: var(--slate-600);
+}
+
+/* Empty state */
+.empty {
+  text-align: center;
+  color: var(--gray-600);
+  font-size: 0.875rem; /* text-sm */
+}
+
+/* Patient Details */
+.patient-wrap {
+  background-color: white;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--slate-200);
+}
+
+.patient-head {
+  margin-bottom: 1rem;
+}
+
+.patient-name {
+  font-size: 1.25rem; /* text-xl */
+  font-weight: 600; /* font-semibold */
+  color: var(--slate-900);
+}
+
+.patient-meta {
+  font-size: 0.875rem; /* text-sm */
+  color: var(--slate-900);
+}
+
+.patient-emergency {
+  font-size: 0.875rem; /* text-sm */
+  color: var(--slate-600);
+}
+
+.patient-right {
+  font-weight: 600; /* font-semibold */
+  color: var(--slate-900);
+  text-align: right;
+}
+
+/* Past Records Section */
+.subhead {
+  font-size: 1.125rem; /* text-lg */
+  font-weight: 600; /* font-semibold */
+  margin-bottom: 0.75rem;
+}
+
+.record-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.record-item {
+  background-color: white;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--slate-200);
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.record-item:hover {
+  background-color: var(--orange-50);
+}
+
+.record-item__title {
+  font-size: 1rem; /* text-base */
+  font-weight: 600; /* font-semibold */
+  color: var(--slate-900);
+}
+
+.record-item__meta {
+  font-size: 0.875rem; /* text-sm */
+  color: var(--slate-600);
+}
+
+/* Buttons */
+.btn {
+  padding: 0.75rem 1.25rem; /* px-4 py-3 */
+  font-size: 1rem; /* text-base */
+  border-radius: 0.375rem; /* rounded-md */
+  cursor: pointer;
+}
+
+.btn--primary {
+  background-color: var(--orange-800);
+  color: white;
+  border: none;
+}
+
+.btn--primary:hover {
+  background-color: var(--orange-900);
+}
+
+.btn--light {
+  background-color: white;
+  color: var(--orange-800);
+  border: 1px solid var(--orange-800);
+}
+
+.btn--light:hover {
+  background-color: var(--orange-50);
+}
+
+.actions--back {
+  text-align: center;
+  margin-top: 1rem;
+}
+
+/* Past Chart View */
+.past--chart {
+  background-color: white;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--slate-200);
+}
+
+.past-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.past-meta {
+  font-size: 0.875rem; /* text-sm */
+  color: var(--slate-900);
+  margin-bottom: 1.25rem;
+}
+
+.past-meta strong {
+  font-weight: 600; /* font-semibold */
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.card {
+  padding: 1rem;
+  border: 1px solid var(--slate-200);
+  border-radius: 0.75rem;
+}
+
+.card__title {
+  font-weight: 600; /* font-semibold */
+  margin-bottom: 0.75rem;
+}
+
+.muted {
+  color: var(--gray-600);
+}
+
+.doc-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-top: 1px dashed var(--slate-200);
+}
+
+.doc-row:first-child {
+  border-top: none;
+}
+
+.past-actions {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.past-actions .btn--accent-block {
+  background-color: #16a34a;
+  color: white;
+  border: 2px solid #22c55e;
+}
+
+.past-actions .btn--accent-block:hover {
+  background-color: #15803d;
+}

@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useNavigate } from "react-router-dom"; // ✅ ADD
+import "./AdminDayHistory.css"; // ✅ ADD
 
 /* ----------------- helpers ----------------- */
 const todayPH = () =>
@@ -86,7 +87,7 @@ export default function AdminDayHistory() {
         const { data: recs, error: recErr } = await supabase
           .from("patient_records")
           .select(
-            `
+            ` 
             id,
             patient_id,
             visit_date,
@@ -146,18 +147,18 @@ export default function AdminDayHistory() {
   const totalPatients = records.length;
 
   return (
-    <section className="max-w-5xl mx-auto">
+    <section className="container">
       {/* Header + Date Picker */}
-      <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-        <h2 className="text-xl font-semibold text-orange-800">
-          Day History: <span className="text-gray-700">{formatHumanDate(dateFilter)}</span>
+      <header className="header">
+        <h2 className="header-title">
+          Day History: <span className="header-date">{formatHumanDate(dateFilter)}</span>
         </h2>
 
-        <label className="inline-flex items-center gap-2">
-          <span className="text-sm text-gray-600">Select Date</span>
+        <label className="date-picker">
+          <span className="date-picker-label">Select Date</span>
           <input
             type="date"
-            className="border rounded-md px-3 py-1.5 text-sm bg-white"
+            className="date-picker-input"
             value={dateFilter}
             onChange={(e) => setSelectedDate(e.target.value)}
             max={todayPH()}
@@ -166,30 +167,20 @@ export default function AdminDayHistory() {
       </header>
 
       {/* Stat: Total Number of Patients (Chart saved) */}
-      <div className="border rounded-lg px-4 py-3 bg-orange-50 border-orange-200 mb-4 flex items-center justify-between">
-        <span className="text-sm font-medium text-orange-900">
-          Total Number of Patients (Chart saved)
-        </span>
-        <span className="text-2xl font-bold text-orange-900">
-          {loading ? "…" : totalPatients}
-        </span>
+      <div className="stat-box">
+        <span className="stat-box-text">Total Number of Patients (Chart saved)</span>
+        <span className="stat-box-number">{loading ? "…" : totalPatients}</span>
       </div>
 
       {/* Error */}
-      {err && (
-        <div className="border rounded-lg p-3 bg-red-50 border-red-200 text-red-700 mb-4 text-sm">
-          {err}
-        </div>
-      )}
+      {err && <div className="error-message">{err}</div>}
 
       {/* List */}
-      <div className="space-y-3">
-        {loading && (
-          <div className="text-sm text-gray-600">Loading patients…</div>
-        )}
+      <div className="record-list">
+        {loading && <div className="loading-text">Loading patients…</div>}
 
         {!loading && records.length === 0 && (
-          <div className="text-sm text-gray-600">
+          <div className="no-records">
             No patient charts saved for {formatHumanDate(dateFilter)}.
           </div>
         )}
@@ -198,30 +189,24 @@ export default function AdminDayHistory() {
           const medLine = summarizeMeds(meds);
           const age = computeAge(patient);
           return (
-            <div
-              key={record.id}
-              className="border rounded-xl p-4 bg-white border-slate-200 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
+            <div key={record.id} className="record-item">
+              <div className="record-header">
                 <div>
-                  <div className="font-semibold text-slate-900">
-                    {fullName(patient)}
-                  </div>
-                  <div className="text-xs text-slate-600">
-                    {patient?.family_number ? `FAM ${patient.family_number}` : "No Fam #"}{" "}
-                    | {Number.isInteger(age) ? `${age} yrs old` : `${age}`}
+                  <div className="record-name">{fullName(patient)}</div>
+                  <div className="record-family-age">
+                    {patient?.family_number ? `FAM ${patient.family_number}` : "No Fam #"} |{" "}
+                    {Number.isInteger(age) ? `${age} yrs old` : `${age}`}
                   </div>
 
-                  <div className="mt-2 text-sm text-slate-800">
-                    <span className="font-medium">Medicine Distributed:</span>{" "}
-                    {medLine}
+                  <div className="meds-line">
+                    <span className="meds-title">Medicine Distributed:</span> {medLine}
                   </div>
                 </div>
 
                 {/* View Chart -> same read-only view as Nurse, by recordId */}
                 <button
                   type="button"
-                  className="px-3 py-1.5 text-sm border rounded-md border-orange-300 text-orange-700 hover:bg-orange-50"
+                  className="view-chart-button"
                   title="View this saved chart"
                   onClick={() =>
                     nav(`/admin/record/${record.id}`, { state: { from: "/admin/day-history" } })

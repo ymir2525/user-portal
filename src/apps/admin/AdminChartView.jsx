@@ -14,6 +14,7 @@ import MedCertForm from "../../components/MedCertForm";
 import LabRequestForm from "../../components/LabRequestForm";
 import PrescriptionForm from "../../components/PrescriptionForm";
 import "../doctor/doctorDash.css";
+import "./AdminChartView.css"; // <-- NEW
 
 function ageDisplayFromBirthdate(birthdate, fallbackAge) {
   if (!birthdate) return (fallbackAge ?? "") === "" ? "—" : String(fallbackAge);
@@ -75,168 +76,167 @@ export default function AdminChartView() {
     day: "2-digit",
   }).format(new Date());
 
- /* ---------- load record ---------- */
-const loadRecord = useCallback(async () => {
-  try {
-    setBanner(null);
+  /* ---------- load record ---------- */
+  const loadRecord = useCallback(async () => {
+    try {
+      setBanner(null);
 
-    if (effectiveRecordId) {
-      const { data, error } = await supabase
-        .from("patient_records")
-        .select(`
-          *,
-          patients:patient_id (
-            id, first_name, middle_name, surname, family_number,
+      if (effectiveRecordId) {
+        const { data, error } = await supabase
+          .from("patient_records")
+          .select(`
+            *,
+            patients:patient_id (
+              id, first_name, middle_name, surname, family_number,
+              sex, age, birthdate, contact_number, contact_person,
+              emergency_contact_name, emergency_relation, address
+            )
+          `)
+          .eq("id", effectiveRecordId)
+          .single();
+        if (error) throw error;
+
+        const active = {
+          record_id: data.id,
+          patient_id: data.patient_id,
+          family_number: data.patients?.family_number ?? "",
+          first_name: data.patients?.first_name ?? "",
+          middle_name: data.patients?.middle_name ?? "",
+          surname: data.patients?.surname ?? "",
+          sex: data.patients?.sex ?? "",
+          age: data.patients?.age ?? "",
+          birthdate: data.patients?.birthdate ?? null,
+          contact_number: data.patients?.contact_number ?? "",
+          contact_person_number: data.patients?.contact_person ?? "",
+          contact_person_name: data.patients?.emergency_contact_name ?? "",
+          relation: data.patients?.emergency_relation ?? "",
+          address: data.patients?.address ?? "",
+          height_cm: data.height_cm,
+          weight_kg: data.weight_kg,
+          blood_pressure: data.blood_pressure,
+          temperature_c: data.temperature_c,
+          chief_complaint: data.chief_complaint,
+          doctor_assessment: data.doctor_assessment ?? "",
+          doctor_management: data.doctor_management ?? "",
+        };
+        setRec(active);
+        setDocAssessment(active.doctor_assessment || "");
+        setDocManagement(active.doctor_management || "");
+        return;
+      }
+
+      if (effectivePatientId) {
+        const { data, error } = await supabase
+          .from("patients")
+          .select(`
+            id, family_number, first_name, middle_name, surname,
             sex, age, birthdate, contact_number, contact_person,
-            emergency_contact_name, emergency_relation, address
-          )
-        `)
-        .eq("id", effectiveRecordId)
-        .single();
-      if (error) throw error;
+            emergency_contact_name, emergency_relation, address,
+            height_cm, weight_kg, blood_pressure, temperature_c, chief_complaint
+          `)
+          .eq("id", effectivePatientId)
+          .single();
+        if (error) throw error;
 
-      const active = {
-        record_id: data.id,
-        patient_id: data.patient_id,
-        family_number: data.patients?.family_number ?? "",
-        first_name: data.patients?.first_name ?? "",
-        middle_name: data.patients?.middle_name ?? "",
-        surname: data.patients?.surname ?? "",
-        sex: data.patients?.sex ?? "",
-        age: data.patients?.age ?? "",
-        birthdate: data.patients?.birthdate ?? null,
-        contact_number: data.patients?.contact_number ?? "",
-        contact_person_number: data.patients?.contact_person ?? "",
-        contact_person_name: data.patients?.emergency_contact_name ?? "",
-        relation: data.patients?.emergency_relation ?? "",
-        address: data.patients?.address ?? "",
-        height_cm: data.height_cm,
-        weight_kg: data.weight_kg,
-        blood_pressure: data.blood_pressure,
-        temperature_c: data.temperature_c,
-        chief_complaint: data.chief_complaint,
-        doctor_assessment: data.doctor_assessment ?? "",
-        doctor_management: data.doctor_management ?? "",
-      };
-      setRec(active);
-      setDocAssessment(active.doctor_assessment || "");
-      setDocManagement(active.doctor_management || "");
-      return;
+        const merged = {
+          record_id: null, // will create on save
+          patient_id: data.id,
+          family_number: data.family_number ?? "",
+          first_name: data.first_name ?? "",
+          middle_name: data.middle_name ?? "",
+          surname: data.surname ?? "",
+          sex: data.sex ?? "",
+          age: data.age ?? "",
+          birthdate: data.birthdate ?? null,
+          contact_number: data.contact_number ?? "",
+          contact_person_number: data.contact_person ?? "",
+          contact_person_name: data.emergency_contact_name ?? "",
+          relation: data.emergency_relation ?? "",
+          address: data.address ?? "",
+          height_cm: data.height_cm,
+          weight_kg: data.weight_kg,
+          blood_pressure: data.blood_pressure,
+          temperature_c: data.temperature_c,
+          chief_complaint: data.chief_complaint,
+          doctor_assessment: "",
+          doctor_management: "",
+        };
+        setRec(merged);
+        setDocAssessment("");
+        setDocManagement("");
+        return;
+      }
+
+      setBanner({ type: "err", msg: "Missing route parameter. No recordId or patientId provided." });
+    } catch (e) {
+      console.error(e);
+      setBanner({ type: "err", msg: e.message || "Failed to load chart" });
     }
+  }, [effectiveRecordId, effectivePatientId]);
 
-    if (effectivePatientId) {
-      const { data, error } = await supabase
-        .from("patients")
-        .select(`
-          id, family_number, first_name, middle_name, surname,
-          sex, age, birthdate, contact_number, contact_person,
-          emergency_contact_name, emergency_relation, address,
-          height_cm, weight_kg, blood_pressure, temperature_c, chief_complaint
-        `)
-        .eq("id", effectivePatientId)
-        .single();
-      if (error) throw error;
+  // --- Realtime: refresh when patient is updated elsewhere ---
+  useEffect(() => {
+    if (!rec?.patient_id) return;
+    const ch = supabase
+      .channel(`patients-${rec.patient_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'patients',
+          filter: `id=eq.${rec.patient_id}`,
+        },
+        () => loadRecord()
+      )
+      .subscribe();
 
-      const merged = {
-        record_id: null, // will create on save
-        patient_id: data.id,
-        family_number: data.family_number ?? "",
-        first_name: data.first_name ?? "",
-        middle_name: data.middle_name ?? "",
-        surname: data.surname ?? "",
-        sex: data.sex ?? "",
-        age: data.age ?? "",
-        birthdate: data.birthdate ?? null,
-         contact_number: data.contact_number ?? "",
-        contact_person_number: data.contact_person ?? "",
-        contact_person_name: data.emergency_contact_name ?? "",
-        relation: data.emergency_relation ?? "",
-        address: data.address ?? "",
-        height_cm: data.height_cm,
-        weight_kg: data.weight_kg,
-        blood_pressure: data.blood_pressure,
-        temperature_c: data.temperature_c,
-        chief_complaint: data.chief_complaint,
-        doctor_assessment: "",
-        doctor_management: "",
-      };
-      setRec(merged);
-      setDocAssessment("");
-      setDocManagement("");
-      return;
-    }
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [rec?.patient_id, loadRecord]);
 
-    setBanner({ type: "err", msg: "Missing route parameter. No recordId or patientId provided." });
-  } catch (e) {
-    console.error(e);
-    setBanner({ type: "err", msg: e.message || "Failed to load chart" });
-  }
-}, [effectiveRecordId, effectivePatientId]);
+  // (optional) Also refresh this view if someone bumps the record (e.g., BHW save sets updated_at)
+  useEffect(() => {
+    if (!rec?.record_id) return;
+    const ch = supabase
+      .channel(`patient_records-${rec.record_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'patient_records',
+          filter: `id=eq.${rec.record_id}`,
+        },
+        () => loadRecord()
+      )
+      .subscribe();
 
-// --- Realtime: refresh when patient is updated elsewhere ---
-useEffect(() => {
-  if (!rec?.patient_id) return;
-  const ch = supabase
-    .channel(`patients-${rec.patient_id}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'patients',
-        filter: `id=eq.${rec.patient_id}`,
-      },
-      () => loadRecord()
-    )
-    .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [rec?.record_id, loadRecord]);
 
-  return () => {
-    supabase.removeChannel(ch);
-  };
-}, [rec?.patient_id, loadRecord]);
+  // --- Realtime: refresh when patient is updated elsewhere ---
+  useEffect(() => {
+    if (!rec?.patient_id) return;
+    const ch = supabase
+      .channel(`patients-${rec.patient_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'patients',
+          filter: `id=eq.${rec.patient_id}`,
+        },
+        () => loadRecord()
+      )
+      .subscribe();
 
-// (optional) Also refresh this view if someone bumps the record (e.g., BHW save sets updated_at)
-useEffect(() => {
-  if (!rec?.record_id) return;
-  const ch = supabase
-    .channel(`patient_records-${rec.record_id}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'patient_records',
-        filter: `id=eq.${rec.record_id}`,
-      },
-      () => loadRecord()
-    )
-    .subscribe();
-
-  return () => supabase.removeChannel(ch);
-}, [rec?.record_id, loadRecord]);
-
-
-// --- Realtime: refresh when patient is updated elsewhere ---
-useEffect(() => {
-  if (!rec?.patient_id) return;
-  const ch = supabase
-    .channel(`patients-${rec.patient_id}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'patients',
-        filter: `id=eq.${rec.patient_id}`,
-      },
-      () => loadRecord()
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(ch);
-  };
-}, [rec?.patient_id, loadRecord]);
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [rec?.patient_id, loadRecord]);
 
   /* ---------- load medicines from inventory (non-expired) ---------- */
   const loadMedicines = useCallback(async () => {
@@ -555,7 +555,7 @@ useEffect(() => {
       {banner && <div className={`banner ${banner.type === "ok" ? "banner--ok" : "banner--err"}`}>{banner.msg}</div>}
       <button
         onClick={() => nav("/admin/queue")}
-        style={{ color: "black", border: "1px solid black", padding: "4px", width: "140px" }}
+        className="btn-back"
       >
         back
       </button>
@@ -568,7 +568,7 @@ useEffect(() => {
             <div className="panel">
               <div className="panel__title">Doctor’s Notes</div>
 
-              <div className="small muted" style={{ marginBottom: 6 }}>Assessment / Diagnosis</div>
+              <div className="small muted mb-6px">Assessment / Diagnosis</div>
               <textarea
                 className="textarea"
                 placeholder="e.g., Acute sinusitis"
@@ -576,7 +576,7 @@ useEffect(() => {
                 onChange={(e) => setDocAssessment(e.target.value)}
               />
 
-              <div className="small muted" style={{ marginTop: 10, marginBottom: 6 }}>Management</div>
+              <div className="small muted mt-10px mb-6px">Management</div>
               <textarea
                 className="textarea"
                 placeholder="e.g., Amoxicillin 500 mg PO TID x 7 days; hydration; rest"
@@ -593,13 +593,13 @@ useEffect(() => {
             <div className="panel__title">Medicine</div>
             <div className="small" style={{ fontWeight: 700, marginTop: 4 }}>Medicine Consumption</div>
 
-            <div className="stack" style={{ alignItems: "stretch" }}>
+            <div className="stack ai-stretch">
               {/* Distributed */}
-              <div className="card card--form" style={{ marginTop: 8 }}>
+              <div className="card card--form card--mt">
                 <h4 className="card__title">Medicine Distributed</h4>
 
                 {distRows.map((row, i) => (
-                  <div className="grid" key={`dist-${i}`} style={{ alignItems: "end" }}>
+                  <div className="grid ai-end" key={`dist-${i}`}>
                     <div className="field">
                       <label className="label">Medicine Classification</label>
                       <select
@@ -670,7 +670,7 @@ useEffect(() => {
                       />
                     </div>
 
-                    <div className="field" style={{ gridColumn: "1 / -2" }}>
+                    <div className="field gc-span">
                       <label className="label">Sig</label>
                       <textarea
                         className="textarea"
@@ -690,7 +690,7 @@ useEffect(() => {
                   </div>
                 ))}
 
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <div className="row-gap-8 mt-8">
                   <button type="button" className="btn btn--orange" onClick={addAllDistributedToList}>
                     Add to List
                   </button>
@@ -698,10 +698,10 @@ useEffect(() => {
               </div>
 
               {/* Prescribed */}
-              <div className="card card--form" style={{ marginTop: 12 }}>
+              <div className="card card--form card--mt-lg">
                 <h4 className="card__title">Medicine Prescribed</h4>
                 {rxRows.map((row, i) => (
-                  <div className="grid" key={`rx-${i}`} style={{ alignItems: "end" }}>
+                  <div className="grid ai-end" key={`rx-${i}`}>
                     <div className="field">
                       <label className="label">Medicine Classification</label>
                       <select
@@ -718,7 +718,7 @@ useEffect(() => {
 
                     <div className="field">
                       <label className="label">Medicine Name</label>
-                      <div style={{ display: "flex", gap: 8 }}>
+                      <div className="row-gap-8">
                         <select
                           className="input"
                           value={row.nameMode === "dropdown" ? row.name : ""}
@@ -770,7 +770,7 @@ useEffect(() => {
                   </div>
                 ))}
 
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <div className="row-gap-8 mt-8">
                   <button type="button" className="btn btn--orange" onClick={addAllPrescribedToList}>
                     Add to List
                   </button>
@@ -789,7 +789,7 @@ useEffect(() => {
           </div>
 
           {/* ====== PAST VISITS ====== */}
-          <div className="panel" style={{ margin: "10px 20px 0", padding: "12px 16px" }}>
+          <div className="panel panel--compact">
             <div className="panel__title">Past Visits</div>
             {loadingPast && <div className="muted small">Loading…</div>}
             {!loadingPast && past.length === 0 && <div className="muted small">No past records found.</div>}
@@ -823,10 +823,9 @@ useEffect(() => {
           </div>
 
           {/* ====== ACTIONS ====== */}
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", maxWidth: 560, margin: "16px auto 0" }}>
+          <div className="actions-bar">
             <button
-              className="btn btn--outline"
-              style={{ borderColor: "#d33", color: "#d33", minWidth: 180 }}
+              className="btn btn--outline btn--danger-outline btn--wide"
               onClick={() => {
                 if (window.confirm("Discard changes to this chart?")) nav("/admin/queue");
               }}
@@ -843,8 +842,7 @@ useEffect(() => {
                 saveChart();
               }}
               disabled={!canSave}
-              className="btn btn--primary"
-              style={{ minWidth: 180 }}
+              className="btn btn--primary btn--wide"
             >
               {saving ? "Saving…" : "Save Chart"}
             </button>

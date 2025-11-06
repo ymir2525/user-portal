@@ -1,6 +1,7 @@
 // src/apps/admin/AdminDashboard.jsx
 import React, { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import "./AdminDashboard.css"; // <-- NEW
 
 const ORANGE   = "#e9772e";   // numbers + accent
 const PEACH    = "#f3b184";   // modal divider (kept)
@@ -309,90 +310,60 @@ export default function AdminDashboard() {
 
   // ----------------- UI -----------------
   return (
-    <div className="space-y-6">
+    <div className="adm-space">
       {/* Date label centered like the mock */}
-      <div className="text-sm text-gray-700 text-center">
+      <div className="adm-date">
         DATE TODAY (Manila): <b>{manilaDate}</b>
       </div>
 
-     {/* ===== Top tiles: EXACT 3 tiles in one row ===== */}
-<div
-  className="flex flex-wrap justify-between gap-4"
-  style={{ width: "100%" }}
->
-  {/* Total Check Up */}
-  <div
-    className="flex-1 min-w-[240px] rounded-xl border-2 p-4 flex flex-col items-center justify-center text-center"
-    style={{
-      backgroundColor: PANEL_BG,
-      borderColor: BORDER_NAVY,
-      maxWidth: "32%",
-      flexBasis: "32%",
-    }}
-  >
-    <div className="text-4xl font-extrabold leading-none" style={{ color: ORANGE }}>
-      {loading ? "…" : queuedToday}
-    </div>
-    <div className="text-[13px] text-gray-800 mt-1">Total Check Up</div>
-  </div>
+      {/* ===== Top tiles: EXACT 3 tiles in one row ===== */}
+      <div className="adm-tiles">
+        {/* Total Check Up */}
+        <div className="adm-tile">
+          <div className="adm-tile-number">
+            {loading ? "…" : queuedToday}
+          </div>
+          <div className="adm-tile-sub">Total Check Up</div>
+        </div>
 
-  {/* Medicine On Stock */}
-  <div
-    className="flex-1 min-w-[240px] rounded-xl border-2 p-4 flex flex-col items-center justify-center text-center"
-    style={{
-      backgroundColor: PANEL_BG,
-      borderColor: BORDER_NAVY,
-      maxWidth: "32%",
-      flexBasis: "32%",
-    }}
-  >
-    <div className="text-4xl font-extrabold leading-none" style={{ color: ORANGE }}>
-      {medLoading ? "…" : medicineOnStock}
-    </div>
-    <div className="text-[13px] text-gray-800 mt-1">Medicine On Stock</div>
-  </div>
+        {/* Medicine On Stock */}
+        <div className="adm-tile">
+          <div className="adm-tile-number">
+            {medLoading ? "…" : medicineOnStock}
+          </div>
+          <div className="adm-tile-sub">Medicine On Stock</div>
+        </div>
 
-  {/* Alert */}
-  <div
-    onClick={() => totalAlerts > 0 && setModalOpen(true)}
-    role="button"
-    tabIndex={0}
-    className="flex-1 min-w-[240px] rounded-xl border-2 p-4 focus:outline-none cursor-pointer"
-    style={{
-      backgroundColor: PANEL_BG,
-      borderColor: ALERT_RED,
-      maxWidth: "32%",
-      flexBasis: "32%",
-    }}
-  >
-    <div className="font-semibold mb-1">Alert</div>
-    {totalAlerts === 0 ? (
-      <div className="text-sm text-gray-600">No low/out-of-stock medicines.</div>
-    ) : (
-      <ul className="list-disc ml-5 text-sm space-y-0.5">
-        {alertsPreview.map((line, i) => (
-          <li key={i}>{line}</li>
-        ))}
-      </ul>
-    )}
-  </div>
-</div>
-
+        {/* Alert */}
+        <div
+          onClick={() => totalAlerts > 0 && setModalOpen(true)}
+          role="button"
+          tabIndex={0}
+          className="adm-tile adm-tile--alert"
+        >
+          <div className="font-semibold mb-1">Alert</div>
+          {totalAlerts === 0 ? (
+            <div className="text-sm text-gray-600">No low/out-of-stock medicines.</div>
+          ) : (
+            <ul className="adm-alerts-list">
+              {alertsPreview.map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
 
       {/* ===== Bottom row: two even cards ===== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="adm-grid">
         {/* Inventory Overview */}
-        <div
-          className="rounded-xl border-[3px] p-4"
-          style={{ backgroundColor: PANEL_BG, borderColor: BORDER_NAVY }}
-        >
-          <div className="font-semibold mb-2">Medicine Inventory Overview</div>
+        <div className="adm-card">
+          <div className="adm-card-title">Medicine Inventory Overview</div>
 
-          <div className="mb-3 flex items-center gap-2">
+          <div className="adm-control">
             <label className="text-sm">Classification</label>
             <select
-              className="border rounded px-2 py-1 text-xs outline-none"
-              style={{ borderColor: "#cbd5e1" }}
+              className="adm-select"
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
             >
@@ -403,23 +374,18 @@ export default function AdminDashboard() {
             </select>
           </div>
 
-          <div className="max-h-72 overflow-auto pr-2">
+          <div className="adm-overview">
             {overviewRows.length === 0 ? (
               <div className="text-sm text-gray-600">No medicines with available stock for this classification.</div>
             ) : (
               overviewRows.map((r) => (
                 <div
                   key={`${r.name}::${r.form}`}
-                  className="flex items-center justify-between py-1 border-b border-dashed"
-                  style={{ borderColor: "#d7dfe7" }}
+                  className="adm-overview-row"
                 >
-                  <div className="text-sm flex items-center gap-2">
+                  <div className="text-sm" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span>{r.name}</span>
-                    <span
-                      className="text-[11px] px-2 py-0.5 rounded-full border"
-                      style={{ borderColor: "#cbd5e1" }}
-                      title="Dosage form"
-                    >
+                    <span className="adm-chip" title="Dosage form">
                       {r.form ?? "—"}
                     </span>
                   </div>
@@ -431,36 +397,33 @@ export default function AdminDashboard() {
         </div>
 
         {/* Staff Today */}
-        <div
-          className="rounded-xl border-[3px] p-4"
-          style={{ backgroundColor: PANEL_BG, borderColor: BORDER_NAVY }}
-        >
-          <div className="font-semibold mb-2">STAFF TODAY</div>
+        <div className="adm-card">
+          <div className="adm-card-title">STAFF TODAY</div>
 
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
+          <div className="adm-staff-gap">
+            <div className="adm-staff-line">
               <div>{nameOf(staff.doctor)}</div>
-              <div className="text-gray-600">Doctor</div>
+              <div className="adm-staff-muted">Doctor</div>
             </div>
 
             {staff.admin.map((p) => (
-              <div className="flex justify-between" key={p.id}>
+              <div className="adm-staff-line" key={p.id}>
                 <div>{nameOf(p)}</div>
-                <div className="text-gray-600">Admin</div>
+                <div className="adm-staff-muted">Admin</div>
               </div>
             ))}
 
             {staff.nurse.map((p) => (
-              <div className="flex justify-between" key={p.id}>
+              <div className="adm-staff-line" key={p.id}>
                 <div>{nameOf(p)}</div>
-                <div className="text-gray-600">Nurse</div>
+                <div className="adm-staff-muted">Nurse</div>
               </div>
             ))}
 
             {staff.bhw.map((p) => (
-              <div className="flex justify-between" key={p.id}>
+              <div className="adm-staff-line" key={p.id}>
                 <div>{nameOf(p)}</div>
-                <div className="text-gray-600">BHW</div>
+                <div className="adm-staff-muted">BHW</div>
               </div>
             ))}
 
@@ -471,53 +434,45 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* ===== Modal (unchanged logic, slight visual alignment) ===== */}
+      {/* ===== Modal ===== */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setModalOpen(false)} />
-          <div className="relative bg-white rounded-xl shadow-lg w-[92vw] max-w-2xl border" style={{ borderColor: PEACH }}>
-            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "#eee" }}>
-              <div className="font-semibold">
-                Medicine Alerts — <span style={{ color: ORANGE }}>{totalAlerts}</span> total
-                <span className="ml-3 text-xs text-gray-600">
+        <div className="adm-modal" aria-modal="true" role="dialog">
+          <div className="adm-modal-backdrop" onClick={() => setModalOpen(false)} />
+          <div className="adm-modal-dialog">
+            <div className="adm-modal-header">
+              <div className="adm-modal-title">
+                Medicine Alerts — <span className="adm-total">{totalAlerts}</span> total
+                <span className="adm-modal-sub">
                   (Out of stock: {alertsCounts.out}, Low stock ≤ {LOW_STOCK_THRESHOLD}: {alertsCounts.low})
                 </span>
               </div>
               <button
                 onClick={() => setModalOpen(false)}
-                className="rounded px-3 py-1 text-sm"
-                style={{ background: NAVY, color: "white" }}
+                className="adm-modal-close"
               >
                 Close
               </button>
             </div>
 
-            <div className="p-4 max-h-[70vh] overflow-auto">
+            <div className="adm-modal-body">
               {alertsAll.length === 0 ? (
                 <div className="text-sm text-gray-600">No alerts.</div>
               ) : (
-                <table className="w-full text-sm">
+                <table className="adm-table">
                   <thead>
-                    <tr className="text-left border-b" style={{ borderColor: "#e6eef6" }}>
-                      <th className="py-2 pr-3">Medicine</th>
-                      <th className="py-2 pr-3">Quantity</th>
-                      <th className="py-2 pr-3">Status</th>
+                    <tr>
+                      <th>Medicine</th>
+                      <th>Quantity</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {alertsAll.map((r) => (
-                      <tr key={r.medicine_name} className="border-b last:border-0" style={{ borderColor: "#f0f0f0" }}>
-                        <td className="py-2 pr-3">{r.medicine_name}</td>
-                        <td className="py-2 pr-3">{r.qty}</td>
-                        <td className="py-2 pr-3">
-                          <span
-                            className="px-2 py-0.5 rounded-full text-xs border"
-                            style={{
-                              background: r.status === "OUT" ? "#fee9e7" : "#fff7e6",
-                              color: r.status === "OUT" ? "#b42318" : ORANGE,
-                              borderColor: r.status === "OUT" ? "#f7c8c3" : "#fde3c0",
-                            }}
-                          >
+                      <tr key={r.medicine_name}>
+                        <td>{r.medicine_name}</td>
+                        <td>{r.qty}</td>
+                        <td>
+                          <span className={r.status === "OUT" ? "badge badge--out" : "badge badge--low"}>
                             {r.status === "OUT" ? "Out of stock" : "Low stock"}
                           </span>
                         </td>

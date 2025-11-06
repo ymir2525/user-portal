@@ -1,4 +1,3 @@
-// NurseQueueChartView.jsx — DROP-IN REPLACEMENT
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -17,6 +16,7 @@ function ageDisplayFromBirthdate(birthdate, fallbackAge) {
   if (months < 12) return `${Math.max(0, months)} month${months === 1 ? "" : "s"}`;
   return String(Math.floor(months / 12));
 }
+
 const sexDisplay = (sex) =>
   (!sex ? "—" : String(sex).toUpperCase().replace("WOMEN", "FEMALE").replace("MEN", "MALE"));
 
@@ -231,7 +231,7 @@ export default function NurseQueueChartView() {
       {banner && <div className={`banner ${banner.type === "ok" ? "banner--ok" : "banner--err"}`}>{banner.msg}</div>}
       <button
         onClick={() => nav(backTo, { replace: true })}
-        style={{ color: "black", border: "1px solid black", padding: 4, width: 140 }}
+        className="btn-back"
       >
         Back
       </button>

@@ -1,8 +1,7 @@
-// src/apps/doctor/DoctorPatients.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import "./doctorDash.css";
+import "./DoctorPatients.css"; // Custom CSS file
 
 export default function DoctorPatients() {
   const nav = useNavigate();
@@ -81,7 +80,7 @@ export default function DoctorPatients() {
     <section className="section section--records">
       <h2 className="section-title">Patient Records</h2>
 
-      <div className="toolbar" style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 8 }}>
+      <div className="toolbar">
         <input
           className="input input--search"
           placeholder="Search by Family No. or Surname..."
@@ -112,8 +111,6 @@ export default function DoctorPatients() {
         >
           {loading ? "Loading..." : "Refresh"}
         </button>
-        {/* doctor view: no Add Patient */}
-        <div />
       </div>
 
       {err && <div className="alert alert--error">{err}</div>}

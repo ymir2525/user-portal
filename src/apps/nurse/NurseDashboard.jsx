@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
-
+import "./nurseDash.css"; // Corrected import for NurseDashboard
 const ORANGE = "#e9772e";
 const PEACH = "#f3b184";
 const PANEL_BG = "#fff7f1";
@@ -272,54 +272,30 @@ export default function NurseDashboard() {
       </div>
 
       {/* Top Tiles */}
-      <div className="flex flex-wrap justify-between gap-4" style={{ width: "100%" }}>
+      <div className="tiles-container">
         {/* Total Check Up */}
-        <div
-          className="flex-1 min-w-[240px] rounded-xl border-2 p-4 flex flex-col items-center justify-center text-center"
-          style={{
-            backgroundColor: PANEL_BG,
-            borderColor: BORDER_NAVY,
-            maxWidth: "32%",
-            flexBasis: "32%",
-          }}
-        >
-          <div className="text-4xl font-extrabold leading-none" style={{ color: ORANGE }}>
+        <div className="tile" style={{ backgroundColor: PANEL_BG, borderColor: BORDER_NAVY }}>
+          <div className="tile-value" style={{ color: ORANGE }}>
             {loading ? "…" : queuedToday}
           </div>
-          <div className="text-[13px] text-gray-800 mt-1">Total Check Up</div>
+          <div className="tile-label">Total Check Up</div>
         </div>
 
         {/* Medicine On Stock */}
-        <div
-          className="flex-1 min-w-[240px] rounded-xl border-2 p-4 flex flex-col items-center justify-center text-center"
-          style={{
-            backgroundColor: PANEL_BG,
-            borderColor: BORDER_NAVY,
-            maxWidth: "32%",
-            flexBasis: "32%",
-          }}
-        >
-          <div className="text-4xl font-extrabold leading-none" style={{ color: ORANGE }}>
+        <div className="tile" style={{ backgroundColor: PANEL_BG, borderColor: BORDER_NAVY }}>
+          <div className="tile-value" style={{ color: ORANGE }}>
             {medLoading ? "…" : medicineOnStock}
           </div>
-          <div className="text-[13px] text-gray-800 mt-1">Medicine On Stock</div>
+          <div className="tile-label">Medicine On Stock</div>
         </div>
 
         {/* Alert */}
-        <div
-          className="flex-1 min-w-[240px] rounded-xl border-2 p-4 focus:outline-none cursor-pointer"
-          style={{
-            backgroundColor: PANEL_BG,
-            borderColor: ALERT_RED,
-            maxWidth: "32%",
-            flexBasis: "32%",
-          }}
-        >
-          <div className="font-semibold mb-1">Alert</div>
+        <div className="tile" style={{ backgroundColor: PANEL_BG, borderColor: ALERT_RED }}>
+          <div className="tile-title">Alert</div>
           {totalAlerts === 0 ? (
-            <div className="text-sm text-gray-600">No low/out-of-stock medicines.</div>
+            <div className="tile-text">No low/out-of-stock medicines.</div>
           ) : (
-            <ul className="list-disc ml-5 text-sm space-y-0.5">
+            <ul className="alerts-preview">
               {alertsPreview.map((line, i) => (
                 <li key={i}>{line}</li>
               ))}
@@ -329,18 +305,14 @@ export default function NurseDashboard() {
       </div>
 
       {/* Bottom Panels */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bottom-panels">
         {/* Medicine Inventory Overview */}
-        <div
-          className="rounded-xl border-2 p-4"
-          style={{ backgroundColor: PANEL_BG, borderColor: BORDER_NAVY }}
-        >
-          <div className="font-semibold mb-2">Medicine Inventory Overview</div>
-          <div className="mb-3 flex items-center gap-2">
-            <label className="text-sm">Classification</label>
+        <div className="panel" style={{ backgroundColor: PANEL_BG, borderColor: BORDER_NAVY }}>
+          <div className="panel-title">Medicine Inventory Overview</div>
+          <div className="panel-select">
+            <label className="select-label">Classification</label>
             <select
-              className="border rounded px-2 py-1 text-xs outline-none"
-              style={{ borderColor: "#cbd5e1" }}
+              className="select-input"
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
             >
@@ -353,29 +325,18 @@ export default function NurseDashboard() {
             </select>
           </div>
 
-          <div className="max-h-72 overflow-auto pr-2">
+          <div className="overview-list">
             {overviewRows.length === 0 ? (
-              <div className="text-sm text-gray-600">
-                No medicines with available stock for this classification.
-              </div>
+              <div className="overview-empty">No medicines with available stock for this classification.</div>
             ) : (
               overviewRows.map((r) => (
                 <div
                   key={`${r.name}::${r.form}`}
-                  className="flex items-center justify-between py-1 border-b border-dashed"
-                  style={{ borderColor: "#d7dfe7" }}
+                  className="overview-row"
                 >
-                  <div className="text-sm flex items-center gap-2">
-                    <span>{r.name}</span>
-                    <span
-                      className="text-[11px] px-2 py-0.5 rounded-full border"
-                      style={{ borderColor: "#cbd5e1" }}
-                      title="Dosage form"
-                    >
-                      {r.form ?? "—"}
-                    </span>
-                  </div>
-                  <div className="text-sm">{r.qty}</div>
+                  <div className="overview-name">{r.name}</div>
+                  <div className="overview-form">{r.form ?? "—"}</div>
+                  <div className="overview-qty">{r.qty}</div>
                 </div>
               ))
             )}
@@ -383,40 +344,37 @@ export default function NurseDashboard() {
         </div>
 
         {/* Staff Today */}
-        <div
-          className="rounded-xl border-2 p-4"
-          style={{ backgroundColor: PANEL_BG, borderColor: BORDER_NAVY }}
-        >
-          <div className="font-semibold mb-2">STAFF TODAY</div>
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
+        <div className="panel" style={{ backgroundColor: PANEL_BG, borderColor: BORDER_NAVY }}>
+          <div className="panel-title">STAFF TODAY</div>
+          <div className="staff-list">
+            <div className="staff-item">
               <div>{nameOf(staff.doctor)}</div>
-              <div className="text-gray-600">Doctor</div>
+              <div className="staff-role">Doctor</div>
             </div>
 
             {staff.admin.map((p) => (
-              <div className="flex justify-between" key={p.id}>
+              <div key={p.id} className="staff-item">
                 <div>{nameOf(p)}</div>
-                <div className="text-gray-600">Admin</div>
+                <div className="staff-role">Admin</div>
               </div>
             ))}
 
             {staff.nurse.map((p) => (
-              <div className="flex justify-between" key={p.id}>
+              <div key={p.id} className="staff-item">
                 <div>{nameOf(p)}</div>
-                <div className="text-gray-600">Nurse</div>
+                <div className="staff-role">Nurse</div>
               </div>
             ))}
 
             {staff.bhw.map((p) => (
-              <div className="flex justify-between" key={p.id}>
+              <div key={p.id} className="staff-item">
                 <div>{nameOf(p)}</div>
-                <div className="text-gray-600">BHW</div>
+                <div className="staff-role">BHW</div>
               </div>
             ))}
 
             {!staff.admin.length && !staff.nurse.length && !staff.bhw.length && (
-              <div className="text-gray-600">No staff logins recorded today.</div>
+              <div className="staff-empty">No staff logins recorded today.</div>
             )}
           </div>
         </div>

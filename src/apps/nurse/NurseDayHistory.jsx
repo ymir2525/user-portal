@@ -1,7 +1,6 @@
-// src/apps/nurse/NurseDayHistory.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { useNavigate } from "react-router-dom"; // ✅ ADD
+import { useNavigate } from "react-router-dom";
 
 /* ----------------- helpers ----------------- */
 const todayPH = () =>
@@ -64,7 +63,7 @@ export default function NurseDayHistory() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [records, setRecords] = useState([]); // [{record, patient, meds[]}]
-  const nav = useNavigate(); // ✅ ADD
+  const nav = useNavigate();
 
   const dateFilter = useMemo(() => {
     if (!selectedDate) return todayPH();
@@ -86,8 +85,7 @@ export default function NurseDayHistory() {
         const { data: recs, error: recErr } = await supabase
           .from("patient_records")
           .select(
-            `
-            id,
+            `id,
             patient_id,
             visit_date,
             patients:patient_id (
@@ -98,8 +96,7 @@ export default function NurseDayHistory() {
               family_number,
               age,
               birthdate
-            )
-          `
+            )`
           )
           .eq("visit_date", dateFilter)
           .eq("status", "completed")   // ✅ show only saved/completed charts
@@ -224,8 +221,8 @@ export default function NurseDayHistory() {
                   className="px-3 py-1.5 text-sm border rounded-md border-orange-300 text-orange-700 hover:bg-orange-50"
                   title="View this saved chart"
                   onClick={() =>
-   nav(`/nurse/history/view/${record.id}`, { state: { from: "/nurse/history" } })
- }
+                    nav(`/nurse/history/view/${record.id}`, { state: { from: "/nurse/history" } })
+                  }
                 >
                   View Chart
                 </button>

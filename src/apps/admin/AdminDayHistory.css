@@ -1,0 +1,164 @@
+:root {
+  --orange-800: #e9772e;
+  --orange-900: #e15252;
+  --gray-700: #374151;
+  --gray-600: #4b5563;
+  --slate-200: #e5e7eb;
+  --slate-900: #1f2937;
+  --red-50: #fee2e2;
+  --red-200: #fca5a5;
+  --orange-50: #fef3c7;
+  --orange-200: #f9d3a0;
+}
+
+/* Max-width container */
+.container {
+  max-width: 50rem; /* 5xl */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Header styles */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 640px) {
+  .header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.header-title {
+  font-size: 1.25rem; /* text-xl */
+  font-weight: 600; /* font-semibold */
+  color: var(--orange-800);
+}
+
+.header-date {
+  color: var(--gray-700);
+}
+
+.date-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.date-picker-label {
+  font-size: 0.875rem; /* text-sm */
+  color: var(--gray-600);
+}
+
+.date-picker-input {
+  padding: 0.375rem 0.75rem; /* px-3 py-1.5 */
+  font-size: 0.875rem; /* text-sm */
+  border: 1px solid #cbd5e1; /* border */
+  border-radius: 0.375rem; /* rounded-md */
+  background-color: white;
+}
+
+/* Stats box (Total Number of Patients) */
+.stat-box {
+  border: 1px solid var(--orange-200);
+  border-radius: 0.75rem; /* rounded-lg */
+  background-color: var(--orange-50);
+  padding: 0.75rem 1rem; /* px-4 py-3 */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-box-text {
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 500; /* font-medium */
+  color: var(--orange-900);
+}
+
+.stat-box-number {
+  font-size: 2rem; /* text-2xl */
+  font-weight: 700; /* font-bold */
+  color: var(--orange-900);
+}
+
+/* Error Message */
+.error-message {
+  border: 1px solid var(--red-200);
+  border-radius: 0.75rem;
+  background-color: var(--red-50);
+  padding: 1rem;
+  font-size: 0.875rem; /* text-sm */
+  color: var(--red-700);
+  margin-bottom: 1rem; /* mb-4 */
+}
+
+/* List of Records */
+.record-list {
+  display: grid;
+  gap: 1rem; /* space-y-3 */
+}
+
+.record-item {
+  background-color: white;
+  border-radius: 1rem; /* rounded-xl */
+  padding: 1rem; /* p-4 */
+  border: 1px solid var(--slate-200);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.record-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.record-name {
+  font-weight: 600;
+  color: var(--slate-900);
+}
+
+.record-family-age {
+  font-size: 0.75rem; /* text-xs */
+  color: var(--slate-600);
+}
+
+.meds-line {
+  margin-top: 0.5rem;
+  font-size: 0.875rem; /* text-sm */
+  color: var(--slate-800);
+}
+
+.meds-title {
+  font-weight: 500; /* font-medium */
+}
+
+.view-chart-button {
+  padding: 0.375rem 1rem; /* px-3 py-1.5 */
+  font-size: 0.875rem; /* text-sm */
+  border: 1px solid #e9a42b; /* border-orange-300 */
+  color: #e9772e; /* text-orange-700 */
+  background-color: transparent;
+  border-radius: 0.375rem; /* rounded-md */
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.view-chart-button:hover {
+  background-color: #fef3c7; /* hover:bg-orange-50 */
+}
+
+/* Loading State */
+.loading-text {
+  font-size: 0.875rem; /* text-sm */
+  color: var(--gray-600);
+}
+
+/* No Records Found */
+.no-records {
+  font-size: 0.875rem; /* text-sm */
+  color: var(--gray-600);
+}

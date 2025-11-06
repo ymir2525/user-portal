@@ -1,4 +1,3 @@
-// src/apps/doctor/DoctorQueueList.jsx
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -84,7 +83,7 @@ export default function DoctorQueueList() {
   };
 
   return (
-    <div className="stack">
+    <div className="queue-list-container">
       {banner && (
         <div className={`banner ${banner.type === "ok" ? "banner--ok" : "banner--err"}`}>{banner.msg}</div>
       )}

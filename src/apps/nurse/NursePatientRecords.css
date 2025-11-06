@@ -1,0 +1,151 @@
+.patient-records-section {
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: auto;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #e9772e;
+}
+
+.pr-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 12px;
+  flex-wrap: wrap;
+}
+
+.pr-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 520px;
+  min-width: 420px;
+}
+
+.pr-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pr-search {
+  flex: 1 1 auto;
+  min-width: 260px;
+  border: 3px solid #93c5fd;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  outline: none;
+}
+
+.pr-search:focus {
+  border-color: #60a5fa;
+}
+
+.btn-outline-blue {
+  background: transparent !important;
+  color: #111827 !important;
+  border: 1px solid #3b82f6 !important;
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+.btn-outline-blue:hover {
+  background: orange !important;
+}
+
+.btn-outline-blue:active {
+  background: #bfdbfe !important;
+}
+
+.btn-outline-blue:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.btn-small {
+  padding: 6px 10px;
+}
+
+.is-active-sort {
+  background: #dbeafe !important;
+}
+
+.family-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.family-list-item {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+  background: #fff;
+}
+
+.family-list-item:hover {
+  background: #f9fafb;
+}
+
+.alert-error {
+  color: #b91c1c;
+  margin-top: 8px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+  padding: 12px;
+}
+
+.modal-sheet {
+  width: min(720px, 94vw);
+  max-height: 80vh;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  height: 52px;
+  padding: 0 14px;
+  border-bottom: 1px solid #e9e9e9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.modal-body {
+  overflow-y: auto;
+  padding: 14px;
+  max-height: calc(80vh - 52px);
+}
+
+.registration-form-container {
+  max-width: 680px;
+  margin: 0 auto;
+}

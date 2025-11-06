@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import "./nurseDash.css";
+import "./nurseDashboardLayout.css"; // Corrected CSS import
+
 export default function NurseDashboardLayout() {
   const nav = useNavigate();
   const loc = useLocation();
@@ -42,7 +43,7 @@ export default function NurseDashboardLayout() {
   if (loading) return null;
 
   return (
-    <div className="nursedash layout">
+    <div className="nursedash">
       {/* Top Header */}
       <header className="app-header">
         <div className="app-header__title">Bagong Silang Phase 8 Health Center</div>

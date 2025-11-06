@@ -1,0 +1,127 @@
+/* Custom styles for NurseQueueChartView */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.banner {
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.banner--ok {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.banner--err {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.btn-back {
+  color: black;
+  border: 1px solid black;
+  padding: 4px;
+  width: 140px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.panel {
+  padding: 15px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.panel__title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: none;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.kv span {
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+.field__label {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.card {
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.card__title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th, .table td {
+  padding: 8px;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+}
+
+.table th {
+  background-color: #f3f4f6;
+}
+
+.is-even {
+  background-color: #f9fafb;
+}
+
+.is-odd {
+  background-color: #ffffff;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 14px;
+}

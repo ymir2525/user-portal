@@ -1,0 +1,100 @@
+/* Basic layout styles */
+.section {
+  padding: 20px;
+}
+
+.section-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+/* Toolbar with search and buttons */
+.toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.input {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  width: 100%;
+}
+
+.input--search {
+  max-width: 400px;
+}
+
+.btn-group {
+  display: flex;
+  gap: 10px;
+}
+
+.btn {
+  padding: 8px 15px;
+  background-color: #f1f1f1;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn--primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn--secondary {
+  background-color: #f1f1f1;
+  color: #333;
+}
+
+.btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Alert message styles */
+.alert {
+  padding: 10px;
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 5px;
+  margin-top: 20px;
+}
+
+.alert--error {
+  background-color: #f8d7da;
+}
+
+/* Family list */
+.family-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.family-list__item {
+  padding: 10px;
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  text-decoration: none;
+  color: #333;
+  font-weight: bold;
+}
+
+.family-list__item:hover {
+  background-color: #e9e9e9;
+}
+
+/* Empty state */
+.empty {
+  font-size: 16px;
+  color: #777;
+  text-align: center;
+  margin-top: 20px;
+}

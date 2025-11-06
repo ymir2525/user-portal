@@ -23,15 +23,8 @@ export default function NurseQueueList() {
     try {
       const { data, error } = await supabase
         .from("patient_records")
-        .select(`
-          id, patient_id, created_at, visit_date, chief_complaint,
-          height_cm, weight_kg, blood_pressure, temperature_c,
-          status, queued,
-          patients:patient_id (
-            id, first_name, middle_name, surname, family_number,
-            sex, age, birthdate, contact_number, contact_person
-          )
-        `)
+        .select(`*,
+          patients:patient_id (id, first_name, middle_name, surname, family_number, sex, age, birthdate, contact_number, contact_person)`)
         .or("status.eq.queued,queued.eq.true")
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -84,9 +77,9 @@ export default function NurseQueueList() {
   };
 
   return (
-    <div className="stack">
+    <div className="queue-container">
       {banner && (
-        <div className={`banner ${banner.type === "ok" ? "banner--ok" : "banner--err"}`}>
+        <div className={`banner ${banner.type === "ok" ? "banner-ok" : "banner-error"}`}>
           {banner.msg}
         </div>
       )}
@@ -95,21 +88,21 @@ export default function NurseQueueList() {
       <div className="queue-list">
         {queue.map((q) => (
           <div key={q.record_id} className="queue-card">
-            <div className="queue-card__left">
-              <div className="queue-card__name">{fullName(q)}</div>
-              <div className="queue-card__meta small muted">
+            <div className="queue-card-left">
+              <div className="queue-card-name">{fullName(q)}</div>
+              <div className="queue-card-meta small muted">
                 {q.family_number} | {q.age ?? "—"} y/o
               </div>
             </div>
-            <div className="queue-card__right">
+            <div className="queue-card-right">
               <button
-                className="btn btn--outline"
+                className="btn-outline"
                 onClick={() => cancelQueueItem(q.record_id)}
               >
                 Cancel
               </button>
               <button
-                className="btn btn--primary"
+                className="btn-primary"
                 onClick={() => nav(`/nurse/queue/${q.record_id}`)}
               >
                 View Chart
