@@ -75,50 +75,111 @@ export default function DoctorQueueChart() {
   }).format(new Date());
 
   /* ---------- load record ---------- */
-  const loadRecord = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from("patient_records")
-        .select(`
-          *, 
-          patients:patient_id (
-            id, first_name, middle_name, surname, family_number,
-            sex, age, birthdate, contact_number, contact_person
-          )
-        `)
-        .eq("id", recordId)
-        .single();
-      if (error) throw error;
+const loadRecord = useCallback(async () => {
+  try {
+    const { data, error } = await supabase
+      .from("patient_records")
+      .select(`
+        *,
+        patients:patient_id (
+          id,
+          first_name,
+          middle_name,
+          surname,
+          family_number,
+          sex,
+          age,
+          birthdate,
+          contact_number,
+          contact_person,
+          emergency_contact_name,
+          emergency_relation,
+          address
+        )
+      `)
+      .eq("id", recordId)
+      .single();
+    if (error) throw error;
 
-      const active = {
-        record_id: data.id,
-        patient_id: data.patient_id,
-        family_number: data.patients?.family_number ?? "",
-        first_name: data.patients?.first_name ?? "",
-        middle_name: data.patients?.middle_name ?? "",
-        surname: data.patients?.surname ?? "",
-        sex: data.patients?.sex ?? "",
-        age: data.patients?.age ?? "",
-        birthdate: data.patients?.birthdate ?? null,
-        contact_number: data.patients?.contact_number ?? "",
-        contact_person: data.patients?.contact_person ?? "",
-        height_cm: data.height_cm,
-        weight_kg: data.weight_kg,
-        blood_pressure: data.blood_pressure,
-        temperature_c: data.temperature_c,
-        chief_complaint: data.chief_complaint,
-        doctor_assessment: data.doctor_assessment ?? "",
-        doctor_management: data.doctor_management ?? "",
-      };
+    const active = {
+      record_id: data.id,
+      patient_id: data.patient_id,
+      family_number: data.patients?.family_number ?? "",
+      first_name: data.patients?.first_name ?? "",
+      middle_name: data.patients?.middle_name ?? "",
+      surname: data.patients?.surname ?? "",
+      sex: data.patients?.sex ?? "",
+      age: data.patients?.age ?? "",
+      birthdate: data.patients?.birthdate ?? null,
+      // ✅ keep the same keys BHW uses
+      contact_number: data.patients?.contact_number ?? "",
+      contact_person_number: data.patients?.contact_person ?? "",   // 09xxxxxxxxx
+     contact_person_name: data.patients?.emergency_contact_name ?? "",
+      relation: data.patients?.emergency_relation ?? "",
+      address: data.patients?.address ?? "",
+      // record fields
+      height_cm: data.height_cm,
+      weight_kg: data.weight_kg,
+      blood_pressure: data.blood_pressure,
+      temperature_c: data.temperature_c,
+      chief_complaint: data.chief_complaint,
+      doctor_assessment: data.doctor_assessment ?? "",
+      doctor_management: data.doctor_management ?? "",
+    };
 
-      setRec(active);
-      setDocAssessment(active.doctor_assessment || "");
-      setDocManagement(active.doctor_management || "");
-    } catch (e) {
-      console.error(e);
-      setBanner({ type: "err", msg: e.message || "Failed to load chart" });
-    }
-  }, [recordId]);
+    setRec(active);
+    setDocAssessment(active.doctor_assessment || "");
+    setDocManagement(active.doctor_management || "");
+  } catch (e) {
+    console.error(e);
+    setBanner({ type: "err", msg: e.message || "Failed to load chart" });
+  }
+}, [recordId]);
+
+// --- Realtime: keep chart in sync if BHW/Admin/Nurse edits the patient row ---
+useEffect(() => {
+  if (!rec?.patient_id) return;
+  const ch = supabase
+    .channel(`patients-${rec.patient_id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'patients',
+        filter: `id=eq.${rec.patient_id}`,
+      },
+      () => loadRecord()
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(ch);
+  };
+}, [rec?.patient_id, loadRecord]);
+
+// (optional) Keep in sync if the same record is updated (e.g., updated_at bump)
+useEffect(() => {
+  if (!rec?.record_id) return;
+  const ch = supabase
+    .channel(`patient_records-${rec.record_id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'patient_records',
+        filter: `id=eq.${rec.record_id}`,
+      },
+      () => loadRecord()
+    )
+    .subscribe();
+
+  return () => supabase.removeChannel(ch);
+}, [rec?.record_id, loadRecord]);
+
+
+
 
   /* ---------- load medicines from inventory (non-expired) ---------- */
   const loadMedicines = useCallback(async () => {

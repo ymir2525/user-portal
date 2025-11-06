@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase-js/source": "github:supabase/supabase-js",
     "@supabase/supabase-js": "^2.75.0",
+    "chart.js": "^4.5.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.3"

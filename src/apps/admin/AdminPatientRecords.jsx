@@ -50,7 +50,7 @@ export default function AdminPatientRecords() {
       const like = q.trim();
       let query = supabase
         .from("patients")
-        .select("family_number,surname")
+        .select("family_number,surname,address") // Include address in the selection
         .order("family_number", { ascending: sortAsc });
 
       if (like) {
@@ -128,7 +128,12 @@ export default function AdminPatientRecords() {
             to={`${linkBase}/${encodeURIComponent(row.family_number)}`}
             className="family-list__item"
           >
-            {row.family_number} - {row.surname}
+            <div className="fam-line">
+              FAM {String(row.family_number).padStart(3, "0")} — {row.surname}
+            </div>
+            <div className="addr-line">
+              {row.address && row.address.trim() ? row.address : "No address on file"}
+            </div>
           </Link>
         ))}
 
