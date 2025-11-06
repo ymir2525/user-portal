@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import "./nurseDash.css";
-
 export default function NurseDashboardLayout() {
   const nav = useNavigate();
   const loc = useLocation();

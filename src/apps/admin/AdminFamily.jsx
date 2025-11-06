@@ -1,3 +1,4 @@
+// src/apps/admin/AdminFamily.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { dateOnly } from "../../lib/utils";
@@ -40,7 +41,10 @@ export default function AdminFamily() {
         setLoading(true); setErr("");
         const { data, error } = await supabase
           .from("patients")
-          .select("id, first_name, middle_name, surname, sex, age, birthdate, family_number, created_at, contact_number, contact_person, emergency_contact_name, emergency_relation")
+          .select(
+            // ⬇️ include address here
+            "id, first_name, middle_name, surname, sex, age, birthdate, family_number, created_at, contact_number, contact_person, emergency_contact_name, emergency_relation, address"
+          )
           .eq("family_number", familyNumber)
           .order("created_at", { ascending: false });
 
@@ -154,6 +158,10 @@ export default function AdminFamily() {
                   {" "} | <strong>Contact Number:</strong> {patient.contact_person || "—"}
                   {" "} | <strong>Relation:</strong> {patient.emergency_relation || "—"}
                 </div>
+                {/* ⬇️ Address in the header box */}
+                <div className="sm:col-span-3" style={{ gridColumn: "1 / -1" }}>
+                  <strong>Address:</strong> {patient.address || "—"}
+                </div>
                 <div className="patient-right">
                   <strong>Fam {patient.family_number || "—"}</strong>
                 </div>
@@ -240,7 +248,6 @@ function PastChartViewLite({ rec, patient, onBack }) {
   }, [rec.id]);
 
   const downloadAsPDF = () => {
-    // Simple, dependency-free approach using the browser print-to-PDF
     const node = printRef.current;
     if (!node) return;
 
@@ -260,7 +267,7 @@ function PastChartViewLite({ rec, patient, onBack }) {
       </style>
     `;
 
-    win.document.write(`<!doctype html><html><head><meta charset=\"utf-8\"><title>Chart</title>${style}</head><body>${node.innerHTML}</body></html>`);
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Chart</title>${style}</head><body>${node.innerHTML}</body></html>`);
     win.document.close();
     win.focus();
     setTimeout(() => { win.print(); win.close(); }, 150);
@@ -277,8 +284,10 @@ function PastChartViewLite({ rec, patient, onBack }) {
         {/* Header details inside printable area */}
         <div className="past-meta" style={{ marginBottom: 12 }}>
           <div><strong>Patient Name:</strong> {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}</div>
-          <div><strong>Doctor in Charge:</strong> {rec.doctor_full_name || "—"}</div>
           <div><strong>Date:</strong> {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</div>
+          {/* ⬇️ Address appears in the printable header too */}
+          <div><strong>Address:</strong> {rec.address ?? patient.address ?? "—"}</div>
+          <div><strong>Contact Number:</strong> {patient.contact_number || "—"}</div>
         </div>
 
         <div className="grid grid--two">

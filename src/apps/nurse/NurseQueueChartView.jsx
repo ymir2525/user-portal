@@ -1,4 +1,4 @@
-// src/apps/nurse/NurseQueueChartView.jsx
+// NurseQueueChartView.jsx — DROP-IN REPLACEMENT
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
@@ -31,6 +31,27 @@ export default function NurseQueueChartView() {
   const [dispensed, setDispensed] = useState([]);
   const [loadingDispensed, setLoadingDispensed] = useState(false);
 
+  // NEW: role + edit state + form
+  const [isNurse, setIsNurse] = useState(false);
+  const [editNurse, setEditNurse] = useState(false);
+  const [nurseForm, setNurseForm] = useState({
+    height_cm: "",
+    weight_kg: "",
+    blood_pressure: "",
+    temperature_c: "",
+    chief_complaint: "",
+  });
+
+  // fetch role (profiles.role === 'NURSE')
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: prof } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      setIsNurse((prof?.role || "").toUpperCase() === "NURSE");
+    })();
+  }, []);
+
   const loadRecord = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -39,14 +60,15 @@ export default function NurseQueueChartView() {
           *,
           patients:patient_id (
             id, first_name, middle_name, surname, family_number,
-            sex, age, birthdate, contact_number, contact_person
+            sex, age, birthdate, contact_number, contact_person,
+            emergency_contact_name, emergency_relation, address
           )
         `)
         .eq("id", recordId)
         .single();
       if (error) throw error;
 
-      setRec({
+      const next = {
         record_id: data.id,
         patient_id: data.patient_id,
         family_number: data.patients?.family_number ?? "",
@@ -57,17 +79,29 @@ export default function NurseQueueChartView() {
         age: data.patients?.age ?? "",
         birthdate: data.patients?.birthdate ?? null,
         contact_number: data.patients?.contact_number ?? "",
-        contact_person: data.patients?.contact_person ?? "",
+        contact_person_number: data.patients?.contact_person ?? "",
+        contact_person_name: data.patients?.emergency_contact_name ?? "",
+        relation: data.patients?.emergency_relation ?? "",
+        address: data.patients?.address ?? "",
         height_cm: data.height_cm,
         weight_kg: data.weight_kg,
         blood_pressure: data.blood_pressure,
         temperature_c: data.temperature_c,
         chief_complaint: data.chief_complaint,
-        // removed nurse_assessment and nurse_notes (read-only view)
         doctor_assessment: data.doctor_assessment ?? "",
         doctor_management: data.doctor_management ?? "",
         created_at: data.created_at,
         completed_at: data.completed_at,
+      };
+      setRec(next);
+
+      // seed nurse form
+      setNurseForm({
+        height_cm: next.height_cm ?? "",
+        weight_kg: next.weight_kg ?? "",
+        blood_pressure: next.blood_pressure ?? "",
+        temperature_c: next.temperature_c ?? "",
+        chief_complaint: next.chief_complaint ?? "",
       });
     } catch (e) {
       console.error(e);
@@ -98,6 +132,48 @@ export default function NurseQueueChartView() {
     loadDispensedForRecord();
   }, [loadRecord, loadDispensedForRecord]);
 
+  // realtime—patients row updated elsewhere
+  useEffect(() => {
+    if (!rec?.patient_id) return;
+    const ch = supabase
+      .channel(`patients-${rec.patient_id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "patients", filter: `id=eq.${rec.patient_id}` },
+        () => loadRecord()
+      )
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [rec?.patient_id, loadRecord]);
+
+  // realtime—this record updated/bumped elsewhere
+  useEffect(() => {
+    if (!rec?.record_id) return;
+    const ch = supabase
+      .channel(`patient_records-${rec.record_id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "patient_records", filter: `id=eq.${rec.record_id}` },
+        () => loadRecord()
+      )
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [rec?.record_id, loadRecord]);
+
+  // realtime—med transactions table for this record
+  useEffect(() => {
+    if (!rec?.record_id) return;
+    const ch = supabase
+      .channel(`medtx-${rec.record_id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "medicine_transactions", filter: `record_id=eq.${rec.record_id}` },
+        () => loadDispensedForRecord()
+      )
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [rec?.record_id, loadDispensedForRecord]);
+
   const activeWithDisplays = useMemo(
     () =>
       rec
@@ -105,6 +181,38 @@ export default function NurseQueueChartView() {
         : null,
     [rec]
   );
+
+  // SAVE nurse notes
+  const saveNurseNotes = async () => {
+    try {
+      setBanner(null);
+
+      // light cleanup
+      const num = (v) => (v === "" || v == null || isNaN(Number(v)) ? null : Number(v));
+      const cleaned = {
+        height_cm: num(String(nurseForm.height_cm).endsWith(".") ? String(nurseForm.height_cm).slice(0, -1) : nurseForm.height_cm),
+        weight_kg: num(String(nurseForm.weight_kg).endsWith(".") ? String(nurseForm.weight_kg).slice(0, -1) : nurseForm.weight_kg),
+        temperature_c: num(String(nurseForm.temperature_c).endsWith(".") ? String(nurseForm.temperature_c).slice(0, -1) : nurseForm.temperature_c),
+        blood_pressure: String(nurseForm.blood_pressure || "").trim() || null, // keep 120/80 string
+        chief_complaint: String(nurseForm.chief_complaint || "").trim() || null,
+      };
+
+      const { error } = await supabase
+        .from("patient_records")
+        .update({ ...cleaned, updated_at: new Date().toISOString() })
+        .eq("id", rec.record_id);
+
+      if (error) throw error;
+
+      // reflect locally
+      setRec((r) => ({ ...r, ...cleaned }));
+      setEditNurse(false);
+      setBanner({ type: "ok", msg: "Nurse’s notes updated." });
+    } catch (e) {
+      console.error(e);
+      setBanner({ type: "err", msg: e.message || "Failed to update nurse’s notes" });
+    }
+  };
 
   if (!rec) {
     return (
@@ -128,9 +236,10 @@ export default function NurseQueueChartView() {
         Back
       </button>
 
+      {/* Patient header */}
       <PatientHeader patient={activeWithDisplays} />
 
-      {/* Two-column layout, mirroring Doctor UI */}
+      {/* Two-column layout */}
       <div className="grid-2">
         {/* Left: Doctor’s Notes (read-only) */}
         <div className="panel">
@@ -147,21 +256,102 @@ export default function NurseQueueChartView() {
           </div>
         </div>
 
-        {/* Right: Nurse’s Notes (renamed panel; just vitals + chief complaint) */}
+        {/* Right: Nurse’s Notes (editable for nurses) */}
         <div className="panel">
-          <div className="panel__title">Nurse’s Notes</div>
-
-          <div className="kv">
-            <div><span>Height:</span> {rec.height_cm ?? "—"} cm</div>
-            <div><span>Weight:</span> {rec.weight_kg ?? "—"} kg</div>
-            <div><span>Blood Pressure:</span> {rec.blood_pressure ?? "—"}</div>
-            <div><span>Temperature:</span> {rec.temperature_c ?? "—"} °C</div>
+          <div className="panel__title">
+            Nurse’s Notes
+            {isNurse && !editNurse && (
+              <button className="btn btn--primary" style={{ float: "right" }} onClick={() => setEditNurse(true)}>
+                Edit
+              </button>
+            )}
           </div>
 
-          <div className="small muted" style={{ marginTop: 10, marginBottom: 6 }}>Chief Complaint</div>
-          <div className="textarea" style={{ pointerEvents: "none", background: "#fafafa" }}>
-            {rec.chief_complaint || "—"}
-          </div>
+          {!isNurse || !editNurse ? (
+            <>
+              <div className="kv">
+                <div><span>Height:</span> {rec.height_cm ?? "—"} cm</div>
+                <div><span>Weight:</span> {rec.weight_kg ?? "—"} kg</div>
+                <div><span>Blood Pressure:</span> {rec.blood_pressure ?? "—"}</div>
+                <div><span>Temperature:</span> {rec.temperature_c ?? "—"} °C</div>
+              </div>
+
+              <div className="small muted" style={{ marginTop: 10, marginBottom: 6 }}>Chief Complaint</div>
+              <div className="textarea" style={{ pointerEvents: "none", background: "#fafafa" }}>
+                {rec.chief_complaint || "—"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid-2">
+                <label className="field">
+                  <div className="field__label">Height (cm)</div>
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    value={nurseForm.height_cm}
+                    onChange={(e)=> setNurseForm((f)=> ({ ...f, height_cm: e.target.value }))}
+                  />
+                </label>
+                <label className="field">
+                  <div className="field__label">Weight (kg)</div>
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    value={nurseForm.weight_kg}
+                    onChange={(e)=> setNurseForm((f)=> ({ ...f, weight_kg: e.target.value }))}
+                  />
+                </label>
+                <label className="field">
+                  <div className="field__label">Blood Pressure</div>
+                  <input
+                    className="input"
+                    placeholder="e.g., 120/80"
+                    value={nurseForm.blood_pressure}
+                    onChange={(e)=> setNurseForm((f)=> ({ ...f, blood_pressure: e.target.value }))}
+                  />
+                </label>
+                <label className="field">
+                  <div className="field__label">Temperature (°C)</div>
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    value={nurseForm.temperature_c}
+                    onChange={(e)=> setNurseForm((f)=> ({ ...f, temperature_c: e.target.value }))}
+                  />
+                </label>
+              </div>
+
+              <label className="field" style={{ marginTop: 8 }}>
+                <div className="field__label">Chief Complaint</div>
+                <textarea
+                  className="textarea"
+                  rows={3}
+                  value={nurseForm.chief_complaint}
+                  onChange={(e)=> setNurseForm((f)=> ({ ...f, chief_complaint: e.target.value }))}
+                />
+              </label>
+
+              <div className="row gap-8" style={{ marginTop: 12 }}>
+                <button className="btn btn--primary" onClick={saveNurseNotes}>Save</button>
+                <button
+                  className="btn btn--outline"
+                  onClick={() => {
+                    setEditNurse(false);
+                    setNurseForm({
+                      height_cm: rec.height_cm ?? "",
+                      weight_kg: rec.weight_kg ?? "",
+                      blood_pressure: rec.blood_pressure ?? "",
+                      temperature_c: rec.temperature_c ?? "",
+                      chief_complaint: rec.chief_complaint ?? "",
+                    });
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

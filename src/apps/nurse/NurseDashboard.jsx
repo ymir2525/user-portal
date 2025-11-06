@@ -141,19 +141,34 @@ export default function NurseDashboard() {
       try {
         const { data: inv, error } = await supabase
           .from("medicine_inventory")
-          .select("medicine_name, quantity, expiration_date")
+          // ADDED: fetch dosage_form so we can display medicine type/form
+          .select("medicine_name, dosage_form, quantity, expiration_date")
           .eq("classification", klass)
           .gte("expiration_date", manilaDate);
         if (error) throw error;
 
-        const map = new Map();
+        // CHANGED: aggregate by (medicine_name + dosage_form)
+        const map = new Map(); // key -> `${name}||${form}`
         (inv || []).forEach((r) => {
-          const key = r.medicine_name;
+          const name = r.medicine_name ?? "";
+          const form = r.dosage_form ?? "—";
+          const key = `${name}||${form}`;
           map.set(key, (map.get(key) || 0) + (Number(r.quantity) || 0));
         });
+
         const rows = Array.from(map.entries())
-          .map(([name, qty]) => ({ name, qty }))
-          .sort((a, b) => a.name.localeCompare(b.name));
+          .map(([key, qty]) => {
+            const [name, form] = key.split("||");
+            return { name, form, qty: Number(qty) || 0 };
+          })
+          // ADDED: hide medicines that have no available stock
+          .filter((r) => r.qty > 0)
+          .sort((a, b) => {
+            const byName = a.name.localeCompare(b.name);
+            if (byName !== 0) return byName;
+            return String(a.form).localeCompare(String(b.form));
+          });
+
         setOverviewRows(rows);
       } catch {
         setOverviewRows([]);
@@ -340,15 +355,26 @@ export default function NurseDashboard() {
 
           <div className="max-h-72 overflow-auto pr-2">
             {overviewRows.length === 0 ? (
-              <div className="text-sm text-gray-600">No medicines for this classification.</div>
+              <div className="text-sm text-gray-600">
+                No medicines with available stock for this classification.
+              </div>
             ) : (
               overviewRows.map((r) => (
                 <div
-                  key={r.name}
+                  key={`${r.name}::${r.form}`}
                   className="flex items-center justify-between py-1 border-b border-dashed"
                   style={{ borderColor: "#d7dfe7" }}
                 >
-                  <div className="text-sm">{r.name}</div>
+                  <div className="text-sm flex items-center gap-2">
+                    <span>{r.name}</span>
+                    <span
+                      className="text-[11px] px-2 py-0.5 rounded-full border"
+                      style={{ borderColor: "#cbd5e1" }}
+                      title="Dosage form"
+                    >
+                      {r.form ?? "—"}
+                    </span>
+                  </div>
                   <div className="text-sm">{r.qty}</div>
                 </div>
               ))
@@ -365,7 +391,7 @@ export default function NurseDashboard() {
           <div className="space-y-1 text-sm">
             <div className="flex justify-between">
               <div>{nameOf(staff.doctor)}</div>
-              <div className="text-gray-600">Doctor-in-Charge</div>
+              <div className="text-gray-600">Doctor</div>
             </div>
 
             {staff.admin.map((p) => (

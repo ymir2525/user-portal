@@ -160,6 +160,7 @@ function GreenToggle({ defaultChecked = true, onChange }) {
 
 /* -------------------- New Account Modal (Tailwind) -------------------- */
 
+/* -------------------- New Account Modal (Tailwind) -------------------- */
 function NewAccountModal({ onClose, onSaved }) {
   const [confirmPasswordLocal, setConfirmPasswordLocal] = useState("");
   const inputBase =
@@ -191,7 +192,7 @@ function NewAccountModal({ onClose, onSaved }) {
     setTimeout(() => setToast(null), ms);
   };
 
-  /* validation (same as before) */
+  /* validation functions */
   const validateSurname = (v) =>
     !v ? "" : v.length < 3 ? "minimum is 3 letters" : v.length > 20 ? "maximum length is 20 letters only" : "";
   const validateFirstname = (v) => {
@@ -290,8 +291,8 @@ function NewAccountModal({ onClose, onSaved }) {
   };
 
   const COMMON_PASSWORDS = new Set([
-    "password","password1","password123","passw0rd",
-    "12345678","123456789","qwerty","abc123","iloveyou","admin","welcome","letmein"
+    "password", "password1", "password123", "passw0rd",
+    "12345678", "123456789", "qwerty", "abc123", "iloveyou", "admin", "welcome", "letmein"
   ]);
   const validatePassword = (pw) => {
     const issues = [];
@@ -397,7 +398,7 @@ function NewAccountModal({ onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-xl rounded-xl bg-white shadow-lg">
+      <div className="w-full max-w-xl rounded-xl bg-white shadow-lg sm:w-full sm:max-w-[90%] sm:p-4 max-h-[90vh] overflow-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b px-5 py-4">
           <div>
@@ -568,13 +569,13 @@ function NewAccountModal({ onClose, onSaved }) {
 
           {toast && (
             <div
-              className={[
-                "mt-3 rounded-md border px-3 py-2 text-sm",
-                toast.type === "error"
-                  ? "border-red-200 bg-red-50 text-red-700"
-                  : toast.type === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-slate-200 bg-slate-50 text-slate-700",
+              className={[ 
+                "mt-3 rounded-md border px-3 py-2 text-sm", 
+                toast.type === "error" 
+                  ? "border-red-200 bg-red-50 text-red-700" 
+                  : toast.type === "success" 
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700" 
+                  : "border-slate-200 bg-slate-50 text-slate-700", 
               ].join(" ")}
             >
               {toast.msg}
@@ -595,6 +596,7 @@ function LabeledInput({ label, children }) {
     </div>
   );
 }
+
 function ErrorText({ text }) {
   return <p className="mt-1 min-h-[1rem] text-xs text-red-700">{text}</p>;
 }

@@ -35,7 +35,8 @@ export default function NursePatientRecords() {
       const like = q.trim();
       let query = supabase
         .from("patients")
-        .select("family_number,surname")
+        // ⬇️ include address so it’s on-hand if you want to show it later
+        .select("family_number,surname,address")
         .order("family_number", { ascending: sortAsc });
 
       if (like) {

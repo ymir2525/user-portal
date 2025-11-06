@@ -1,9 +1,18 @@
-// src/apps/BhwFamily.jsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { dateOnly } from "../lib/utils";
 import { supabase } from "../lib/supabase";
 import "./BhwFamily.css";
+
+/* Consistent name formatter with middle name + extension */
+const formatPersonName = (p = {}) => {
+  const first = p.first_name || "";
+  const middle = p.middle_name ? `${p.middle_name} ` : "";
+  const sur = p.surname || "";
+  const ext = p.name_extension || p.extension || "";
+  const extPart = ext ? `, ${ext}` : "";
+  return `${first} ${middle}${sur}${extPart}`.trim();
+};
 
 export default function BhwFamily() {
   const { familyNumber } = useParams();
@@ -35,23 +44,23 @@ export default function BhwFamily() {
       month: "2-digit",
       day: "2-digit",
     }).formatToParts(new Date());
-    const y = parts.find(p => p.type === "year").value;
-    const m = parts.find(p => p.type === "month").value;
-    const d = parts.find(p => p.type === "day").value;
+    const y = parts.find((p) => p.type === "year").value;
+    const m = parts.find((p) => p.type === "month").value;
+    const d = parts.find((p) => p.type === "day").value;
     return `${y}-${m}-${d}`;
   };
 
-  // New-record form state
+  // New-record form state (emergency fields removed from user input)
   const [form, setForm] = useState({
-    heightCm: "", weightKg: "", bloodPressure: "", temperatureC: "",
+    heightCm: "",
+    weightKg: "",
+    bloodPressure: "",
+    temperatureC: "",
     chiefComplaint: "",
-    emergencyName: "",
-    emergencyRelation: "",
-    emergencyNumber: "",
-    proceedToQueue: true
+    proceedToQueue: true,
   });
 
-  // === validation (same rules, rewritten as a function) ===
+  // === validation (nurse rules for vitals + CC only) ===
   const validate = useCallback((f) => {
     const errs = {};
     const trimmedCC = (f.chiefComplaint || "").trim();
@@ -59,7 +68,6 @@ export default function BhwFamily() {
     // helpers
     const toNum = (v) => (v === "" || v == null ? null : Number(v));
     const onlyDigits = (s) => (s || "").replace(/\D/g, "");
-    const lettersOnlyBad = (s) => /[^A-Za-z\s]/.test(s || "");
 
     // required vitals
     if (!f.heightCm) errs.heightCm = "Required.";
@@ -133,20 +141,6 @@ export default function BhwFamily() {
 
     if (trimmedCC.length > 1000) errs.chiefComplaint = "Max 1000 chars.";
 
-    // Emergency contact
-    if (!f.emergencyName || !f.emergencyName.trim()) {
-      errs.emergencyName = "Required.";
-    } else if (lettersOnlyBad(f.emergencyName)) {
-      errs.emergencyName = "Letters/spaces only.";
-    }
-    if (!f.emergencyRelation || !f.emergencyRelation.trim()) {
-      errs.emergencyRelation = "Required.";
-    } else if (lettersOnlyBad(f.emergencyRelation)) {
-      errs.emergencyRelation = "Letters/spaces only.";
-    }
-    const num = (f.emergencyNumber || "").replace(/\D/g, "");
-    if (!num || num.length !== 11) errs.emergencyNumber = "Exactly 11 digits.";
-
     if (Object.keys(errs).length) errs._form = "Please fix the highlighted fields.";
     return errs;
   }, []);
@@ -167,21 +161,32 @@ export default function BhwFamily() {
     (async () => {
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess?.session?.user?.id;
-      if (!uid) { nav("/login", { replace: true }); return; }
+      if (!uid) {
+        nav("/login", { replace: true });
+        return;
+      }
 
       const { data: prof, error: profErr } = await supabase
-        .from("profiles").select("role").eq("id", uid).single();
+        .from("profiles")
+        .select("role")
+        .eq("id", uid)
+        .single();
 
       if (profErr || !prof || String(prof.role).toUpperCase() !== "BHW") {
-        await supabase.auth.signOut().catch(()=>{});
-        nav("/login", { replace: true }); return;
+        await supabase.auth.signOut().catch(() => {});
+        nav("/login", { replace: true });
+        return;
       }
 
       try {
-        setLoading(true); setErr("");
+        setLoading(true);
+        setErr("");
         const { data, error } = await supabase
           .from("patients")
-          .select("id, first_name, middle_name, surname, sex, age, birthdate, family_number, created_at, contact_number, contact_person, emergency_contact_name, emergency_relation")
+          // include name_extension so we can render Jr/Sr/III
+          .select(
+            "id, first_name, middle_name, surname, name_extension, sex, age, birthdate, family_number, created_at, contact_number, contact_person, emergency_contact_name, emergency_relation, address"
+          )
           .eq("family_number", familyNumber)
           .order("created_at", { ascending: false });
 
@@ -197,25 +202,26 @@ export default function BhwFamily() {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [familyNumber, nav]);
 
   const logout = async () => {
-    await supabase.auth.signOut().catch(()=>{});
+    await supabase.auth.signOut().catch(() => {});
     nav("/login", { replace: true });
   };
 
   // Load one patient + past records
   const openPatient = async (patientId) => {
     try {
-      setLoading(true); setErr("");
+      setLoading(true);
+      setErr("");
 
       const [{ data: p, error: e1 }, { data: recs, error: e2 }] = await Promise.all([
-        supabase.from("patients").select("*").eq("id", patientId).single(),
-        supabase.from("patient_records")
-          .select("*")
-          .eq("patient_id", patientId)
-          .order("created_at", { ascending: false }),
+        // explicitly include name_extension
+        supabase.from("patients").select("*, name_extension").eq("id", patientId).single(),
+        supabase.from("patient_records").select("*").eq("patient_id", patientId).order("created_at", { ascending: false }),
       ]);
 
       if (e1) throw e1;
@@ -227,13 +233,6 @@ export default function BhwFamily() {
       setPastView("list");
       setSelectedPast(null);
 
-      // Prefill emergency snapshot for modal
-      setForm((prev) => ({
-        ...prev,
-        emergencyName: p.emergency_contact_name || "",
-        emergencyRelation: p.emergency_relation || "",
-        emergencyNumber: p.contact_person || "",
-      }));
       setErrors({});
     } catch (e) {
       console.error(e);
@@ -264,7 +263,6 @@ export default function BhwFamily() {
 
       const num = (v) => (v === "" || v == null ? null : Number(v));
       const trim = (s) => (s || "").trim();
-      const onlyDigits = (s) => (s || "").replace(/\D/g, "");
 
       const payload = {
         patient_id: patient.id,
@@ -275,10 +273,12 @@ export default function BhwFamily() {
         temperature_c: num(form.temperatureC.endsWith(".") ? form.temperatureC.slice(0, -1) : form.temperatureC),
         chief_complaint: trim(form.chiefComplaint) || null,
 
-        emergency_contact_name: trim(form.emergencyName) || null,
-        emergency_relation: trim(form.emergencyRelation) || null,
-        emergency_contact_number: onlyDigits(form.emergencyNumber) || null,
+        // Emergency snapshot (READ-ONLY in modal)
+        emergency_contact_name: patient.emergency_contact_name || null,
+        emergency_relation: patient.emergency_relation || null,
+        emergency_contact_number: patient.contact_person || null,
 
+        address: patient.address || null, // snapshot
         visit_date: manilaTodayDate(),
         queued: true,
         status: "queued",
@@ -286,20 +286,12 @@ export default function BhwFamily() {
         created_by: uid,
       };
 
-      const { error } = await supabase
-        .from("patient_records")
-        .insert(payload)
-        .select()
-        .single();
-
+      const { error } = await supabase.from("patient_records").insert(payload).select().single();
       if (error) throw error;
 
       // flag the patient as queued
       if (form.proceedToQueue) {
-        await supabase
-          .from("patients")
-          .update({ queued: true, queued_at: new Date().toISOString() })
-          .eq("id", patient.id);
+        await supabase.from("patients").update({ queued: true, queued_at: new Date().toISOString() }).eq("id", patient.id);
       }
 
       // reload past records
@@ -345,7 +337,13 @@ export default function BhwFamily() {
           ← Back to Records
         </Link>
         <h2 className="text-teal-700 font-semibold">Family: {familyNumber}</h2>
-        <button onClick={async()=>{ await supabase.auth.signOut().catch(()=>{}); nav("/login", { replace: true }); }} className="text-sm text-slate-600 hover:text-slate-900">
+        <button
+          onClick={async () => {
+            await supabase.auth.signOut().catch(() => {});
+            nav("/login", { replace: true });
+          }}
+          className="text-sm text-slate-600 hover:text-slate-900"
+        >
           Log Out
         </button>
       </div>
@@ -367,12 +365,8 @@ export default function BhwFamily() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold truncate">
-                          {m.first_name} {m.middle_name ? `${m.middle_name} ` : ""}{m.surname}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          • {m.sex} • {m.age} Years Old
-                        </div>
+                        <div className="font-semibold truncate">{formatPersonName(m)}</div>
+                        <div className="text-xs text-slate-500">• {m.sex} • {m.age} Years Old</div>
                       </div>
                       <div className="text-xs text-slate-600">{dateOnly(m.birthdate)}</div>
                     </div>
@@ -389,9 +383,7 @@ export default function BhwFamily() {
               <div className="max-w-5xl mx-auto">
                 {/* header with + New Record */}
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                  <div className="text-lg font-semibold">
-                    {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
-                  </div>
+                  <div className="text-lg font-semibold">{formatPersonName(patient)}</div>
                   <button
                     onClick={() => setIsModalOpen(true)}
                     className="inline-flex items-center rounded-lg border border-teal-600 text-teal-700 px-3 py-2 text-sm font-semibold hover:bg-teal-50"
@@ -402,14 +394,25 @@ export default function BhwFamily() {
 
                 {/* meta */}
                 <div className="grid sm:grid-cols-3 gap-3 mb-4 text-sm">
-                  <div><span className="font-semibold">Birthdate:</span> {dateOnly(patient.birthdate) || "—"}</div>
-                  <div><span className="font-semibold">Age:</span> {computedAge || "—"} yrs old</div>
-                  <div><span className="font-semibold">Sex:</span> {patient.sex || "—"}</div>
-                  <div><span className="font-semibold">Contact Number:</span> {patient.contact_number || "—"}</div>
+                  <div>
+                    <span className="font-semibold">Birthdate:</span> {dateOnly(patient.birthdate) || "—"}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Age:</span> {computedAge || "—"} yrs old
+                  </div>
+                  <div>
+                    <span className="font-semibold">Sex:</span> {patient.sex || "—"}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Contact Number:</span> {patient.contact_number || "—"}
+                  </div>
                   <div className="sm:col-span-2">
-                    <span className="font-semibold">Contact Person:</span> {patient.emergency_contact_name || "—"}
-                    {" "} | <span className="font-semibold">Contact Number:</span> {patient.contact_person || "—"}
-                    {" "} | <span className="font-semibold">Relation:</span> {patient.emergency_relation || "—"}
+                    <span className="font-semibold">Contact Person:</span> {patient.emergency_contact_name || "—"}{" "}
+                    | <span className="font-semibold">Contact Number:</span> {patient.contact_person || "—"}{" "}
+                    | <span className="font-semibold">Relation:</span> {patient.emergency_relation || "—"}
+                  </div>
+                  <div className="sm:col-span-3">
+                    <span className="font-semibold">Address:</span> {patient.address || "—"}
                   </div>
                   <div className="justify-self-end font-semibold">Fam {patient.family_number || "—"}</div>
                 </div>
@@ -419,13 +422,14 @@ export default function BhwFamily() {
                   <>
                     <div className="text-sm font-semibold mb-2">Past Records</div>
                     <div className="flex flex-col gap-2">
-                      {records.length === 0 && (
-                        <div className="text-sm text-slate-500">No past records found.</div>
-                      )}
-                      {records.map(r => (
+                      {records.length === 0 && <div className="text-sm text-slate-500">No past records found.</div>}
+                      {records.map((r) => (
                         <button
                           key={r.id}
-                          onClick={() => { setSelectedPast(r); setPastView("combined"); }}
+                          onClick={() => {
+                            setSelectedPast(r);
+                            setPastView("combined");
+                          }}
                           className="w-full text-left rounded-lg border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50"
                         >
                           <div className="font-bold text-base">
@@ -454,7 +458,10 @@ export default function BhwFamily() {
                   <PastCombinedView
                     rec={selectedPast}
                     patient={patient}
-                    onBack={() => { setPastView("list"); setSelectedPast(null); }}
+                    onBack={() => {
+                      setPastView("list");
+                      setSelectedPast(null);
+                    }}
                   />
                 )}
               </div>
@@ -465,34 +472,38 @@ export default function BhwFamily() {
 
       {/* NEW RECORD MODAL */}
       {isModalOpen && (
-        <Modal onClose={() => setIsModalOpen(false)} title={`New Record — ${patient?.first_name ?? ""} ${patient?.middle_name ? patient.middle_name + " " : ""}${patient?.surname ?? ""}`}>
+        <Modal onClose={() => setIsModalOpen(false)} title={`New Record — ${formatPersonName(patient ?? {})}`}>
           <form onSubmit={submitNewRecord} className="space-y-5">
             {/* Patient summary */}
             <div className="grid sm:grid-cols-2 gap-4">
-              <ReadOnly label="Patient Name" value={`${patient.first_name} ${patient.middle_name ? patient.middle_name + " " : ""}${patient.surname}`} />
+              <ReadOnly label="Patient Name" value={formatPersonName(patient)} />
               <ReadOnly label="Family Number" value={patient.family_number || ""} />
               <ReadOnly label="Age" value={computedAge || ""} />
               <ReadOnly label="Birthdate" value={dateOnly(patient.birthdate) || ""} />
+              <div className="sm:col-span-2">
+                <ReadOnly label="Address" value={patient.address || "—"} />
+              </div>
             </div>
 
-            {/* Emergency */}
+            {/* Emergency — READ-ONLY */}
             <div>
               <div className="text-sm font-semibold mb-2">In case of Emergency</div>
               <div className="grid sm:grid-cols-2 gap-4">
-                <TextField label="Contact Person" value={form.emergencyName} onChange={(v)=>setField("emergencyName", v)} placeholder="Enter full name" error={errors.emergencyName}/>
-                <TextField label="Relation" value={form.emergencyRelation} onChange={(v)=>setField("emergencyRelation", v)} placeholder="e.g., Wife" error={errors.emergencyRelation}/>
+                <ReadOnly label="Contact Person" value={patient.emergency_contact_name || "—"} />
+                <ReadOnly label="Relation" value={patient.emergency_relation || "—"} />
               </div>
-              <DigitsField label="Contact Number" value={form.emergencyNumber} onChange={(v)=>setField("emergencyNumber", v)} exactLen={11} placeholder="09123456789" error={errors.emergencyNumber}/>
+              <ReadOnly label="Contact Number" value={patient.contact_person || "—"} />
+              <p className="text-xs text-slate-500 mt-1">Manage emergency details from Patient Registration. They’re snapshotted here on save.</p>
             </div>
 
             {/* Nurse’s Notes */}
             <div>
               <div className="text-sm font-semibold mb-2">Nurse’s Notes</div>
               <div className="grid sm:grid-cols-2 gap-4">
-                <Field label="Height (cm)" value={form.heightCm} onChange={v => setField("heightCm", v)} mode="height" placeholder="e.g. 163.6" error={errors.heightCm}/>
-                <Field label="Weight (kg)" value={form.weightKg} onChange={v => setField("weightKg", v)} mode="weight" placeholder="e.g. 53.72" error={errors.weightKg}/>
-                <Field label="Blood Pressure" value={form.bloodPressure} onChange={v => setField("bloodPressure", v)} mode="bp" placeholder="e.g. 120/80" error={errors.bloodPressure}/>
-                <Field label="Temperature (°C)" value={form.temperatureC} onChange={v => setField("temperatureC", v)} mode="temp" placeholder="e.g. 36.8" error={errors.temperatureC}/>
+                <Field label="Height (cm)" value={form.heightCm} onChange={(v) => setField("heightCm", v)} mode="height" placeholder="e.g. 163.6" error={errors.heightCm} />
+                <Field label="Weight (kg)" value={form.weightKg} onChange={(v) => setField("weightKg", v)} mode="weight" placeholder="e.g. 53.72" error={errors.weightKg} />
+                <Field label="Blood Pressure" value={form.bloodPressure} onChange={(v) => setField("bloodPressure", v)} mode="bp" placeholder="e.g. 120/80" error={errors.bloodPressure} />
+                <Field label="Temperature (°C)" value={form.temperatureC} onChange={(v) => setField("temperatureC", v)} mode="temp" placeholder="e.g. 36.8" error={errors.temperatureC} />
               </div>
 
               <div className="mt-3">
@@ -500,7 +511,7 @@ export default function BhwFamily() {
                 <textarea
                   className={`w-full rounded-md border px-3 py-2 text-sm ${errors.chiefComplaint ? "border-red-400" : "border-slate-300"} focus:outline-none focus:ring-2 focus:ring-teal-500`}
                   value={form.chiefComplaint}
-                  onChange={e => setField("chiefComplaint", e.target.value)}
+                  onChange={(e) => setField("chiefComplaint", e.target.value)}
                   rows={4}
                 />
                 {errors.chiefComplaint && <p className="text-xs text-red-600 mt-1">{errors.chiefComplaint}</p>}
@@ -512,7 +523,7 @@ export default function BhwFamily() {
                 type="checkbox"
                 className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                 checked={form.proceedToQueue}
-                onChange={e => setField("proceedToQueue", e.target.checked)}
+                onChange={(e) => setField("proceedToQueue", e.target.checked)}
               />
               Proceed to Queuing
             </label>
@@ -552,7 +563,8 @@ function PastCombinedView({ rec, patient, onBack }) {
     let mounted = true;
     (async () => {
       try {
-        setLoading(true); setErr("");
+        setLoading(true);
+        setErr("");
         const { data, error } = await supabase
           .from("record_documents")
           .select("*")
@@ -566,7 +578,9 @@ function PastCombinedView({ rec, patient, onBack }) {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [rec.id]);
 
   const printNow = () => window.print();
@@ -574,22 +588,23 @@ function PastCombinedView({ rec, patient, onBack }) {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h3 className="text-base font-semibold">
-          Patient Record — {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}
-        </h3>
+        <h3 className="text-base font-semibold">Patient Record — {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</h3>
         <div className="flex gap-2">
-          <button onClick={onBack} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Back</button>
-          <button onClick={printNow} className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-700">Download Chart</button>
+          <button onClick={onBack} className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            Back
+          </button>
+          <button onClick={printNow} className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-700">
+            Download Chart
+          </button>
         </div>
       </div>
 
       {/* Patient header */}
       <div className="mt-3 rounded-lg border border-slate-200 p-4">
-        <div className="font-semibold">
-          {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}
-        </div>
+        <div className="font-semibold">{formatPersonName(patient)}</div>
         <div className="text-xs text-slate-600 mt-1">
-          Birthdate: {dateOnly(patient.birthdate) || "—"} • Age: {(() => {
+          Birthdate: {dateOnly(patient.birthdate) || "—"} • Age:{" "}
+          {(() => {
             const bd = patient?.birthdate ? new Date(patient.birthdate) : null;
             if (!bd || isNaN(bd)) return patient?.age ?? "—";
             const t = new Date();
@@ -597,13 +612,13 @@ function PastCombinedView({ rec, patient, onBack }) {
             const m = t.getMonth() - bd.getMonth();
             if (m < 0 || (m === 0 && t.getDate() < bd.getDate())) a--;
             return a;
-          })()} • Sex: {patient.sex || "—"}
+          })()}{" "}
+          • Sex: {patient.sex || "—"}
         </div>
         <div className="text-xs text-slate-600">Contact Number: {patient.contact_number || "—"}</div>
+        <div className="text-xs text-slate-600">Address: {rec.address ?? patient.address ?? "—"}</div>
         <div className="text-xs text-slate-600">
-          <span className="font-semibold">Contact Person:</span> {patient.emergency_contact_name || "—"} |
-          <span className="font-semibold"> Contact Number:</span> {patient.contact_person || "—"} |
-          <span className="font-semibold"> Relation:</span> {patient.emergency_relation || "—"}
+          <span className="font-semibold">Contact Person:</span> {patient.emergency_contact_name || "—"} |<span className="font-semibold"> Contact Number:</span> {patient.contact_person || "—"} |<span className="font-semibold"> Relation:</span> {patient.emergency_relation || "—"}
         </div>
       </div>
 
@@ -632,13 +647,19 @@ function PastCombinedView({ rec, patient, onBack }) {
         {!loading && !err && (
           <div className="flex flex-col gap-2">
             {docs.length === 0 && <div className="text-sm text-slate-500">No documents saved for this record.</div>}
-            {docs.map(d => (
+            {docs.map((d) => (
               <div key={d.id} className="rounded-lg border border-slate-200 px-3 py-2 text-sm flex items-center justify-between flex-wrap gap-2">
                 <div className="font-semibold uppercase">
                   {d.type} <span className="normal-case text-slate-500 text-xs ml-2">• {new Date(d.created_at).toLocaleString()}</span>
                 </div>
                 <div className="text-xs">
-                  {d.url ? <a className="text-indigo-700 hover:underline" href={d.url} target="_blank" rel="noreferrer">open file</a> : "no file URL"}
+                  {d.url ? (
+                    <a className="text-indigo-700 hover:underline" href={d.url} target="_blank" rel="noreferrer">
+                      open file
+                    </a>
+                  ) : (
+                    "no file URL"
+                  )}
                 </div>
               </div>
             ))}
@@ -677,6 +698,7 @@ function ReadOnly({ label, value }) {
   );
 }
 
+// (legacy helpers kept for parity)
 function TextField({ label, value, onChange, placeholder, error }) {
   return (
     <div>
@@ -684,7 +706,7 @@ function TextField({ label, value, onChange, placeholder, error }) {
       <input
         className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 ${error ? "border-red-400" : "border-slate-300"}`}
         value={value}
-        onChange={(e)=>onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoComplete="off"
         spellCheck={false}
@@ -712,9 +734,7 @@ function DigitsField({ label, value, onChange, exactLen = 11, placeholder, error
         maxLength={exactLen}
         title={`Must be exactly ${exactLen} digits`}
       />
-      {(error || showLenError) && (
-        <p className="text-xs text-red-600 mt-1">{error || `Must be exactly ${exactLen} digits.`}</p>
-      )}
+      {(error || showLenError) && <p className="text-xs text-red-600 mt-1">{error || `Must be exactly ${exactLen} digits.`}</p>}
     </div>
   );
 }
@@ -766,16 +786,21 @@ function Field({ label, value, onChange, mode, placeholder, error }) {
       }
     };
 
-    if (mode === "height") { onChange(clampDecimal(raw, 5, 1)); return; }
-    if (mode === "weight") { onChange(clampDecimal(raw, 4, 2)); return; }
-    if (mode === "temp")   { onChange(clampDecimal(raw, 4, 2)); return; }
+    if (mode === "height") {
+      onChange(clampDecimal(raw, 5, 1));
+      return;
+    }
+    if (mode === "weight") {
+      onChange(clampDecimal(raw, 4, 2));
+      return;
+    }
+    if (mode === "temp") {
+      onChange(clampDecimal(raw, 4, 2));
+      return;
+    }
 
     onChange(raw);
   };
-
-  const inputMode =
-    mode === "bp" ? "numeric" :
-    (mode ? "decimal" : undefined);
 
   return (
     <div>

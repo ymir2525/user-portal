@@ -39,7 +39,7 @@ export default function DoctorFamily() {
         setLoading(true); setErr("");
         const { data, error } = await supabase
           .from("patients")
-          .select("id, first_name, middle_name, surname, sex, age, birthdate, family_number, created_at, contact_number, contact_person, emergency_contact_name, emergency_relation")
+          .select("id, first_name, middle_name, surname, sex, age, birthdate, family_number, created_at, contact_number, contact_person, emergency_contact_name, emergency_relation, address")
           .eq("family_number", familyNumber)
           .order("created_at", { ascending: false });
 
@@ -155,6 +155,7 @@ export default function DoctorFamily() {
                 <div><strong>Age:</strong> {computedAge || "—"} yrs old</div>
                 <div><strong>Sex:</strong> {patient.sex || "—"}</div>
                 <div><strong>Contact Number:</strong> {patient.contact_number || "—"}</div>
+                <div><strong>Address:</strong> {patient.address || "—"}</div>
                 <div className="patient-emergency">
                   <strong>Contact Person:</strong> {patient.emergency_contact_name || "—"}
                   {" "} | <strong>Contact Number:</strong> {patient.contact_person || "—"}
@@ -284,6 +285,7 @@ function PastChartViewLite({ rec, patient, onBack }) {
         {/* Header details inside printable area */}
         <div className="past-meta" style={{ marginBottom: 12 }}>
           <div><strong>Patient Name:</strong> {patient.first_name} {patient.middle_name ? patient.middle_name + " " : ""}{patient.surname}</div>
+            <div><strong>Address:</strong> {patient.address || "—"}</div> {/* ← add this */}
           <div><strong>Doctor in Charge:</strong> {rec.doctor_full_name || "—"}</div>
           <div><strong>Date:</strong> {dateOnly(rec.completed_at || rec.visit_date || rec.created_at)}</div>
         </div>

@@ -140,6 +140,7 @@ export default function NurseFamily() {
     setErr("");
   };
 
+  const [errMsg, setErrMsg] = useState("");
   const canSubmit = useMemo(() => Object.keys(validate(form)).length === 0, [form, validate]);
 
   // Role guard + initial family load (NURSE)
@@ -162,7 +163,8 @@ export default function NurseFamily() {
         setLoading(true); setErr("");
         const { data, error } = await supabase
           .from("patients")
-          .select("id, first_name, middle_name, surname, sex, age, birthdate, family_number, created_at, contact_number, contact_person, emergency_contact_name, emergency_relation")
+          // ⬇️ include address like BHW
+          .select("id, first_name, middle_name, surname, sex, age, birthdate, family_number, created_at, contact_number, contact_person, emergency_contact_name, emergency_relation, address")
           .eq("family_number", familyNumber)
           .order("created_at", { ascending: false });
 
@@ -249,6 +251,8 @@ export default function NurseFamily() {
         emergency_contact_name: trim(form.emergencyName) || null,
         emergency_relation: trim(form.emergencyRelation) || null,
         emergency_contact_number: onlyDigits(form.emergencyNumber) || null,
+        // ⬇️ snapshot the address into the record (like BHW)
+        address: patient.address || null,
         visit_date: manilaTodayDate(),
         queued: true,
         status: "queued",
@@ -370,6 +374,10 @@ export default function NurseFamily() {
                     {" "} | <span className="font-semibold">Contact Number:</span> {patient.contact_person || "—"}
                     {" "} | <span className="font-semibold">Relation:</span> {patient.emergency_relation || "—"}
                   </div>
+                  {/* ⬇️ Address row inside the patient meta header */}
+                  <div className="sm:col-span-3">
+                    <span className="font-semibold">Address:</span> {patient.address || "—"}
+                  </div>
                   <div className="justify-self-end font-semibold">Fam {patient.family_number || "—"}</div>
                 </div>
 
@@ -429,6 +437,9 @@ export default function NurseFamily() {
               <ReadOnly label="Family Number" value={patient.family_number || ""} />
               <ReadOnly label="Age" value={computedAge || ""} />
               <ReadOnly label="Birthdate" value={dateOnly(patient.birthdate) || ""} />
+                <div className="sm:col-span-2">
+    <ReadOnly label="Address" value={patient.address || "—"} />
+  </div>
             </div>
 
             <div>
@@ -553,6 +564,8 @@ function PastCombinedView({ rec, patient, onBack }) {
           })()} • Sex: {patient.sex || "—"}
         </div>
         <div className="text-xs text-slate-600">Contact Number: {patient.contact_number || "—"}</div>
+        {/* ⬇️ Address line in the printable header */}
+        <div className="text-xs text-slate-600">Address: {rec.address ?? patient.address ?? "—"}</div>
         <div className="text-xs text-slate-600">
           <span className="font-semibold">Contact Person:</span> {patient.emergency_contact_name || "—"} |
           <span className="font-semibold"> Contact Number:</span> {patient.contact_person || "—"} |

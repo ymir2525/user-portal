@@ -1,5 +1,4 @@
-// src/apps/admin/MedicineInventory.jsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import "./MedicineInventory.css";
 
@@ -26,7 +25,7 @@ const DOSAGE_FORMS = [
 ];
 
 export default function MedicineInventory({ flash }) {
-  const [tab, setTab] = useState("stock"); // 'stock' | 'dispense'
+  const [tab, setTab] = useState("stock"); // 'stock' | 'dispense' | 'expiry'
   const [inventory, setInventory] = useState([]);
   const [totals, setTotals] = useState({ stock: 0, distributed: 0 });
 
@@ -40,7 +39,7 @@ export default function MedicineInventory({ flash }) {
       if (!map[key]) map[key] = [];
       if (!map[key].includes(row.medicine_name)) map[key].push(row.medicine_name);
     }
-    Object.values(map).forEach(list => list.sort((a,b)=>a.localeCompare(b)));
+    Object.values(map).forEach((list) => list.sort((a, b) => a.localeCompare(b)));
     return map;
   }, [catalog]);
 
@@ -58,7 +57,7 @@ export default function MedicineInventory({ flash }) {
   const [expirationDate, setExpirationDate] = useState("");
   const [busy, setBusy] = useState(false);
 
-  /* --------- NEW: Remove by SKU modal state --------- */
+  /* --------- Remove by SKU modal state --------- */
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [removeSku, setRemoveSku] = useState("");
   const [removeCandidate, setRemoveCandidate] = useState(null); // lot row matched by SKU
@@ -114,24 +113,15 @@ export default function MedicineInventory({ flash }) {
       supabase.from("medicine_transactions").select("quantity, direction"),
     ]);
     const stock = (inv || [])
-      .filter(r => !r.expiration_date || r.expiration_date >= todayStr)
+      .filter((r) => !r.expiration_date || r.expiration_date >= todayStr)
       .reduce((s, r) => s + (Number(r.quantity) || 0), 0);
     const distributed = (tx || [])
-      .filter(t => t.direction === "out")
+      .filter((t) => t.direction === "out")
       .reduce((s, r) => s + (Number(r.quantity) || 0), 0);
     setTotals({ stock, distributed });
   }
 
-  // Format Date to "YYYY-MM-DD HH:MM:SS" (UTC, no 'Z')
-  function fmtPgTimestampUTC(d) {
-    const pad = (n) => String(n).padStart(2, "0");
-    return (
-      `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}` +
-      ` ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
-    );
-  }
-
-  // ---- helpers (put above loadDispenseFor or nearby) ----
+  // ---- helpers (dispense day range) ----
   function fmtPgTimestampUTC(d) {
     const pad = (n) => String(n).padStart(2, "0");
     return (
@@ -146,14 +136,15 @@ export default function MedicineInventory({ flash }) {
     return { from: fmtPgTimestampUTC(startManila), to: fmtPgTimestampUTC(nextManila) };
   }
 
-  // ---- REPLACE your loadDispenseFor with this ----
+  // ---- Dispense loader ----
   async function loadDispenseFor(dateStr) {
     const { from, to } = manilaDayUtcRange(dateStr);
 
-    // 1) get transactions for the day (no non-existent columns)
     const { data: tx, error } = await supabase
       .from("medicine_transactions")
-      .select("id, created_at, direction, classification, medicine_name, dosage_form, quantity, patient_id")
+      .select(
+        "id, created_at, direction, classification, medicine_name, dosage_form, quantity, patient_id"
+      )
       .eq("direction", "out")
       .gte("created_at", from)
       .lt("created_at", to)
@@ -168,8 +159,7 @@ export default function MedicineInventory({ flash }) {
 
     const rows = tx || [];
 
-    // 2) look up patient info for any patient_ids we have
-    const ids = Array.from(new Set(rows.map(r => r.patient_id).filter(Boolean)));
+    const ids = Array.from(new Set(rows.map((r) => r.patient_id).filter(Boolean)));
     let byPatient = new Map();
     if (ids.length) {
       const { data: pats, error: pErr } = await supabase
@@ -177,14 +167,15 @@ export default function MedicineInventory({ flash }) {
         .select("id, family_number, first_name, middle_name, surname")
         .in("id", ids);
       if (!pErr && pats) {
-        byPatient = new Map(pats.map(p => [p.id, p]));
+        byPatient = new Map(pats.map((p) => [p.id, p]));
       }
     }
 
-    // 3) enrich rows for rendering
-    const enriched = rows.map(r => {
+    const enriched = rows.map((r) => {
       const p = r.patient_id ? byPatient.get(r.patient_id) : null;
-      const patient_name = p ? [p.first_name, p.middle_name, p.surname].filter(Boolean).join(" ") : "—";
+      const patient_name = p
+        ? [p.first_name, p.middle_name, p.surname].filter(Boolean).join(" ")
+        : "—";
       const family_number = p?.family_number || "—";
       return { ...r, patient_name, family_number };
     });
@@ -193,9 +184,7 @@ export default function MedicineInventory({ flash }) {
     setDistributedOnSelected(enriched.reduce((s, r) => s + (Number(r.quantity) || 0), 0));
   }
 
-  /* --------- NEW: SKU helpers for removal --------- */
-
-  // Display-only SKU generator identical to Analytics
+  /* --------- SKU helpers for removal --------- */
   function makeSKUFromRow(row) {
     const pad2 = (n) => String(n).padStart(2, "0");
     const code =
@@ -220,13 +209,11 @@ export default function MedicineInventory({ flash }) {
     const matches = (rows || []).filter((r) => makeSKUFromRow(r) === target);
     if (matches.length === 1) return matches[0];
     if (matches.length > 1) {
-      // very rare collision because of id % 1000 – prefer newest id
       return matches.sort((a, b) => Number(b.id) - Number(a.id))[0];
     }
     return null;
   }
 
-  // refresh candidate when input or inventory changes
   useEffect(() => {
     if (!removeSku) {
       setRemoveCandidate(null);
@@ -235,7 +222,6 @@ export default function MedicineInventory({ flash }) {
     setRemoveCandidate(resolveSkuToRow(removeSku, inventory));
   }, [removeSku, inventory]);
 
-  // delete handler: remove lot + log transaction (out)
   async function handleRemoveLotBySku() {
     if (!removeCandidate) return;
     setBusyRemove(true);
@@ -266,6 +252,7 @@ export default function MedicineInventory({ flash }) {
       setRemoveCandidate(null);
       loadInventory();
       loadTotals();
+      loadExpiry();
     } catch (e) {
       console.error(e);
       flash?.("Failed to remove stock.", "error");
@@ -274,10 +261,111 @@ export default function MedicineInventory({ flash }) {
     }
   }
 
+  // ---------- Average Expiry Proximity state/logic ---------- //
+  const [expiryRows, setExpiryRows] = useState([]); // full dataset
+  const [expiryLoading, setExpiryLoading] = useState(false);
+  const [expiryNote, setExpiryNote] = useState("");
+
+  const currentYear = new Date().getFullYear();
+  const [yearOptions, setYearOptions] = useState(["ALL", String(currentYear)]);
+  const [expYear, setExpYear] = useState("ALL"); // "ALL" | number-string
+  const [expMonth, setExpMonth] = useState("ALL"); // "ALL" | "01".."12"
+
+  function pad(n) {
+    return String(n).padStart(2, "0");
+  }
+  function addMonths(d, n) {
+    const x = new Date(d);
+    x.setUTCMonth(x.getUTCMonth() + n);
+    return x;
+  }
+
+  const recomputeYearOptionsFromRows = (rows) => {
+    const maxExpYear = (rows || []).reduce((max, r) => {
+      const y = r.expiration_date ? new Date(r.expiration_date).getFullYear() : currentYear;
+      return Math.max(max, y);
+    }, currentYear);
+
+    const years = ["ALL"];
+    for (let y = currentYear; y <= maxExpYear; y++) years.push(String(y));
+    setYearOptions(years);
+
+    setExpYear((prev) => {
+      if (prev === "ALL") return prev;
+      const py = Number(prev);
+      if (Number.isNaN(py) || py < currentYear) return String(currentYear);
+      if (py > maxExpYear) return String(maxExpYear);
+      return prev;
+    });
+  };
+
+  const loadExpiry = async () => {
+    try {
+      setExpiryLoading(true);
+      const { data, error } = await supabase
+        .from("medicine_inventory")
+        .select("id, medicine_name, dosage_form, quantity, expiration_date")
+        .order("expiration_date", { ascending: true });
+      if (error) throw error;
+      const rows = (data || []).map((r) => ({ ...r, sku: makeSKUFromRow(r) }));
+      setExpiryRows(rows);
+      recomputeYearOptionsFromRows(rows);
+    } catch (e) {
+      console.error("expiry fetch failed:", e?.message || e);
+      setExpiryRows([]);
+    } finally {
+      setExpiryLoading(false);
+    }
+  };
+
+  const expiryCalc = useMemo(() => {
+    if (!expiryRows.length) return { rows: [], note: "" };
+
+    if (expYear === "ALL") return { rows: expiryRows, note: "" };
+
+    const targetMonth = expMonth === "ALL" ? "01" : expMonth;
+    const targetStart = new Date(`${expYear}-${targetMonth}-01T00:00:00+08:00`);
+    const targetEnd = expMonth === "ALL" ? addMonths(targetStart, 12) : addMonths(targetStart, 1);
+
+    const inRange = expiryRows.filter((r) => {
+      if (!r.expiration_date) return false;
+      const d = new Date(r.expiration_date);
+      return d >= targetStart && d < targetEnd;
+    });
+
+    if (inRange.length) return { rows: inRange, note: "" };
+
+    const within24 = expiryRows.filter((r) => {
+      if (!r.expiration_date) return false;
+      const d = new Date(r.expiration_date);
+      return d >= targetEnd && d < addMonths(targetEnd, 24);
+    });
+
+    const beyond24 = expiryRows.filter((r) => {
+      if (!r.expiration_date) return false;
+      const d = new Date(r.expiration_date);
+      return d >= addMonths(targetEnd, 24);
+    });
+
+    const note =
+      within24.length || beyond24.length
+        ? "No exact matches. Showing the closest future expiries: first within the next 2 years, then more than 2 years ahead."
+        : "No future expiries found.";
+
+    return { rows: [...within24, ...beyond24], note };
+  }, [expiryRows, expYear, expMonth]);
+
+  useEffect(() => {
+    setExpiryNote(expiryCalc.note || "");
+  }, [expiryCalc.note]);
+
+  // initial loads + realtime
   useEffect(() => {
     loadCatalog();
     loadInventory();
     loadTotals();
+    loadDispenseFor(selectedDate);
+    loadExpiry();
 
     const invCh = supabase
       .channel("realtime_inventory_admin")
@@ -287,6 +375,7 @@ export default function MedicineInventory({ flash }) {
         () => {
           loadInventory();
           loadTotals();
+          loadExpiry();
         }
       )
       .subscribe();
@@ -312,28 +401,19 @@ export default function MedicineInventory({ flash }) {
       )
       .subscribe();
 
-    // initial load for dispense tab
-    loadDispenseFor(selectedDate);
-
     return () => {
       supabase.removeChannel(invCh);
       supabase.removeChannel(txCh);
       supabase.removeChannel(catCh);
     };
-    // intentionally include selectedDate so realtime refresh uses the current pick
   }, [todayStr, selectedDate]);
 
   // search filter (stock tab)
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return inventory;
-    return inventory.filter(r => {
-      const s = [
-        r.classification,
-        r.medicine_name,
-        r.dosage_form,
-        r.expiration_date,
-      ]
+    return inventory.filter((r) => {
+      const s = [r.classification, r.medicine_name, r.dosage_form, r.expiration_date]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -353,9 +433,7 @@ export default function MedicineInventory({ flash }) {
   }
 
   const medicinesForSelectedClass = useMemo(() => {
-    return effectiveClassification
-      ? groupedOptions[effectiveClassification] || []
-      : [];
+    return effectiveClassification ? groupedOptions[effectiveClassification] || [] : [];
   }, [effectiveClassification, groupedOptions]);
 
   const qtyNum = Number(quantity);
@@ -395,7 +473,6 @@ export default function MedicineInventory({ flash }) {
 
     setBusy(true);
     try {
-      // 1) Add/merge to inventory as a new lot
       const { error } = await supabase.from("medicine_inventory").insert([
         {
           classification: cls,
@@ -407,7 +484,6 @@ export default function MedicineInventory({ flash }) {
       ]);
       if (error) throw error;
 
-      // 2) Ensure catalog knows about it (with dosage_form)
       await supabase
         .from("medicine_catalog")
         .upsert(
@@ -415,7 +491,6 @@ export default function MedicineInventory({ flash }) {
           { onConflict: "classification,medicine_name" }
         );
 
-      // 3) Log transaction
       const { data: sess } = await supabase.auth.getSession();
       const staff_id = sess?.session?.user?.id ?? null;
       await supabase.from("medicine_transactions").insert({
@@ -432,6 +507,7 @@ export default function MedicineInventory({ flash }) {
       setShowModal(false);
       resetModal();
       loadTotals();
+      loadExpiry();
     } catch (err) {
       console.error(err);
       flash?.("Failed to add stock.", "error");
@@ -458,6 +534,12 @@ export default function MedicineInventory({ flash }) {
         >
           Dispense List
         </button>
+        <button
+          className={`mi-tab ${tab === "expiry" ? "is-active" : ""}`}
+          onClick={() => setTab("expiry")}
+        >
+          Average Expiry Proximity
+        </button>
       </div>
 
       {tab === "stock" && (
@@ -473,14 +555,11 @@ export default function MedicineInventory({ flash }) {
               <div className="mi-metric__value">{totals.distributed}</div>
             </div>
             <div className="mi-actions">
-              <button
-                className="btn btn--green"
-                onClick={() => setShowModal(true)}
-              >
+              <button className="btn btn--green" onClick={() => setShowModal(true)}>
                 Add Stock
               </button>
 
-              {/* NEW: Remove Stock button */}
+              {/* Remove Stock button */}
               <button
                 className="btn btn--red"
                 onClick={() => {
@@ -626,6 +705,113 @@ export default function MedicineInventory({ flash }) {
         </>
       )}
 
+      {/* Average Expiry Proximity tab */}
+      {tab === "expiry" && (
+        <>
+          <div className="mi-metrics">
+            <div className="mi-metric">
+              <div className="mi-metric__label">Total Medicine in Stock</div>
+              <div className="mi-metric__value">{totals.stock}</div>
+            </div>
+            {expiryLoading && (
+              <div className="mi-metric">
+                <div className="mi-metric__label">Status</div>
+                <div className="mi-metric__value" style={{ fontSize: 14 }}>
+                  Loading…
+                </div>
+              </div>
+            )}
+            <div className="mi-actions" style={{ gap: 8 }}>
+              <div className="field" style={{ margin: 0 }}>
+                <label className="label">Year</label>
+                <select
+                  className="input"
+                  value={expYear}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setExpYear(v);
+                    if (v === "ALL") setExpMonth("ALL");
+                  }}
+                >
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>
+                      {y === "ALL" ? "All years" : y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div
+                className="field"
+                style={{ margin: 0, opacity: expYear === "ALL" ? 0.6 : 1 }}
+              >
+                <label className="label">Month</label>
+                <select
+                  className="input"
+                  value={expMonth}
+                  onChange={(e) => setExpMonth(e.target.value)}
+                  disabled={expYear === "ALL"}
+                >
+                  <option value="ALL">All months</option>
+                  {Array.from({ length: 12 }, (_, i) => pad(i + 1)).map((m) => (
+                    <option key={m} value={m}>
+                      {new Date(`2025-${m}-01`).toLocaleString("en-US", {
+                        month: "long",
+                      })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {expiryNote && (
+            <div className="text-xs" style={{ color: "#666", marginBottom: 8 }}>
+              {expiryNote}
+            </div>
+          )}
+
+          <div className="card">
+            <h4 className="card__title">Average Expiry Proximity</h4>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>SKU #</th>
+                    <th>Medicine Name</th>
+                    <th>Medicine Type</th>
+                    <th>Quantity</th>
+                    <th>Expiry Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(expiryCalc.rows.length ? expiryCalc.rows : expiryRows).length ? (
+                    (expiryCalc.rows.length ? expiryCalc.rows : expiryRows).map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.sku}</td>
+                        <td>{r.medicine_name}</td>
+                        <td>{r.dosage_form || "—"}</td>
+                        <td>{r.quantity}</td>
+                        <td>
+                          {r.expiration_date
+                            ? new Date(r.expiration_date).toLocaleDateString()
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="table-empty">
+                        No expiring medicines found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Add Stock Modal */}
       {showModal && (
         <div className="mi-modal">
@@ -681,13 +867,11 @@ export default function MedicineInventory({ flash }) {
                         ? "Select medicine"
                         : "Select classification first"}
                     </option>
-                    {(groupedOptions[effectiveClassification] || []).map(
-                      (m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      )
-                    )}
+                    {(groupedOptions[effectiveClassification] || []).map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
                     {effectiveClassification && (
                       <option value="Others">Others</option>
                     )}
@@ -778,7 +962,7 @@ export default function MedicineInventory({ flash }) {
         </div>
       )}
 
-      {/* NEW: Remove Stock Modal */}
+      {/* Remove Stock Modal */}
       {showRemoveModal && (
         <div className="mi-modal">
           <div className="mi-modal__body" style={{ borderColor: "#b42318" }}>
@@ -852,7 +1036,7 @@ export default function MedicineInventory({ flash }) {
         </div>
       )}
 
-      {/* NEW: Final Confirm Modal */}
+      {/* Final Confirm Modal */}
       {confirmRemove && (
         <div className="mi-modal">
           <div className="mi-modal__body" style={{ borderColor: "#b42318" }}>

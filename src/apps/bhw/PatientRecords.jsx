@@ -35,18 +35,21 @@ function PatientRecords() {
       const like = q.trim();
       let query = supabase
         .from("patients")
-        .select("family_number,surname")
+        // ⬇️ include address so we can display & search it
+        .select("family_number,surname,address")
         .order("family_number", { ascending: sortAsc });
 
       if (like) {
+        // ⬇️ searchable by family number, surname, OR address
         query = query.or(
-          `family_number.ilike.%${like}%,surname.ilike.%${like}%`
+          `family_number.ilike.%${like}%,surname.ilike.%${like}%,address.ilike.%${like}%`
         );
       }
 
       const { data, error } = await query;
       if (error) throw error;
 
+      // De-dup per family_number + surname (keep one row per family)
       const map = new Map();
       (data || []).forEach(r => {
         const key = `${r.family_number}||${r.surname}`;
@@ -79,7 +82,7 @@ function PatientRecords() {
           display:flex;
           align-items:center;
           gap:8px;
-          flex:1 1 520px;       /* grows, keeps left side together */
+          flex:1 1 520px;
           min-width:420px;
         }
         .pr-right{
@@ -91,7 +94,7 @@ function PatientRecords() {
         .pr-search{
           flex:1 1 auto;
           min-width:260px;
-          border:3px solid #93c5fd;   /* blue-300 */
+          border:3px solid #93c5fd; /* blue-300 */
           border-radius:8px;
           padding:10px 12px;
           background:#fff;
@@ -99,7 +102,7 @@ function PatientRecords() {
         }
         .pr-search:focus{ border-color:#60a5fa; } /* blue-400 */
 
-        /* Outline-blue buttons: transparent bg, blue border, black text, blue on hover */
+        /* Outline-blue buttons */
         .btn--outline-blue{
           background: transparent !important;
           color: #111827 !important;
@@ -109,24 +112,41 @@ function PatientRecords() {
           box-shadow: none !important;
           cursor: pointer;
         }
-        .btn--outline-blue:hover{ background:orange !important; } /* blue-100 */
-        .btn--outline-blue:active{ background:#bfdbfe !important; } /* blue-200 */
+        .btn--outline-blue:hover{ background:orange !important; }
+        .btn--outline-blue:active{ background:#bfdbfe !important; }
         .btn--outline-blue:disabled{ opacity:.6; cursor:not-allowed; }
 
         .btn-sm{ padding:6px 10px; }
 
-        /* Small visual cue for active sort */
-        .is-active-sort{
-          background:#dbeafe !important;         /* blue-100 */
-        }
+        .is-active-sort{ background:#dbeafe !important; } /* blue-100 */
 
-        /* List styles (safe) */
+        /* List styles */
         .family-list{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }
         .family-list__item{
           display:block; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px;
           color:inherit; text-decoration:none; background:#fff;
         }
         .family-list__item:hover{ background:#f9fafb; }
+
+        /* Family number on top, bold */
+        .fam-line{
+          font-weight:700;
+          text-transform:uppercase;
+          letter-spacing:0.3px;
+          margin-bottom:2px;
+        }
+
+        /* Address indicator under it (like your screenshot) */
+        .addr-line{
+          font-size:12px;
+          color:#4b5563; /* gray-600 */
+          line-height:1.25rem;
+          overflow:hidden;
+          text-overflow:ellipsis;
+          display:-webkit-box;
+          -webkit-line-clamp:2;  /* keep it tidy if address is long */
+          -webkit-box-orient:vertical;
+        }
 
         .alert.alert--error{ color:#b91c1c; margin-top:8px; }
       `}</style>
@@ -139,7 +159,7 @@ function PatientRecords() {
         <div className="pr-left">
           <input
             className="pr-search"
-            placeholder="Search by Family No. or Surname..."
+            placeholder="Search by Family No., Surname, or Address…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             autoComplete="off"
@@ -162,7 +182,7 @@ function PatientRecords() {
           </button>
         </div>
 
-        {/* RIGHT: Refresh + Add Patient (kept on the right) */}
+        {/* RIGHT: Refresh + Add Patient */}
         <div className="pr-right">
           <button
             className="btn--outline-blue btn-sm"
@@ -190,7 +210,12 @@ function PatientRecords() {
             to={`/bhw/family/${encodeURIComponent(row.family_number)}`}
             className="family-list__item"
           >
-            {row.family_number} - {row.surname}
+            {/* Top: FAM + number (bold), you can include surname if you want */}
+          <div className="fam-line">FAM {String(row.family_number).padStart(3, "0")} — {row.surname}</div>
+            {/* Address indicator just below, as requested */}
+            <div className="addr-line">
+              {row.address && row.address.trim() ? row.address : "No address on file"}
+            </div>
           </Link>
         ))}
 
