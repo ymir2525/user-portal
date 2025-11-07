@@ -263,9 +263,9 @@ export default function ReferralForm({ active, onBack, onSavePdf }) {
       <div id="print-referral" className="print-only">
         <div className="ref-sheet">
           <div className="ref-header">
-            <div className="ref-title">Caybiga Health Center</div>
-            <div className="ref-sub">1 General Luis St., Caybiga Caloocan City</div>
-            <div className="ref-sub">caybigastaff@gmail.com</div>
+            <div className="ref-title">Phase 8 Bagong Silang Health Center</div>
+            <div className="ref-sub">Phase 8 Bagong Silang, Caloocan City</div>
+          
             <div className="ref-form-name">REFERRAL FORM</div>
           </div>
 

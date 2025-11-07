@@ -296,9 +296,9 @@ export default function MedCertForm({ active, onBack, onSavePdf }) {
         <div className="mc-sheet">
           <div className="mc-top-border" />
           <div className="mc-header">
-            <div className="mc-clinic">Caybiga Health Center</div>
-            <div className="mc-sub">1 General Luis St., Caybiga Caloocan City</div>
-            <div className="mc-sub">caybigastellite@gmail.com</div>
+            <div className="mc-clinic">Phase 8 Bagong Silang Health Center</div>
+            <div className="mc-sub">Phase 8 Bagong Silang Caloocan City</div>
+            
           </div>
 
           <div className="mc-date">
