@@ -465,66 +465,131 @@ export default function DataAnalytics() {
 
   /** ── Widgets ─────────────────────────────────────────────────────────── */
 
-  // Seasonal Demand Analysis (per selected classification, +5% buffer; high/low different when possible)
-  const seasonalWidget = useMemo(() => {
-    if (!classification) {
-      return {
-        highest: "Pick a classification to see high/low for this month.",
-        lowest: "—",
-        actionable: "Select a classification above. We’ll show the top & bottom medicine (across forms) with a +5% buffer.",
-      };
-    }
-
-    const lastYear = currentYear - 1;
-    const monthIdx = currentMonth;
-
-    // Aggregate last year's current month totals per medicine_name within the selected classification
-    const byMed = new Map(); // med -> total qty (across forms)
-    tx.forEach(r => {
-      if (r.direction !== "out") return;
-      const cls  = (r.classification || "").trim();
-      const med  = (r.medicine_name || "").trim();
-      const form = (r.dosage_form || "").trim();
-      if (cls !== classification) return;
-
-      const y = toYear(r.created_at);
-      if (y !== lastYear) return;
-      if (toMonthIdx(r.created_at) !== monthIdx) return;
-
-      // Only consider meds that exist in inventory for this classification
-      const maybeValidTuples = [
-        `${cls}::${med}::${form}`,
-        `${cls}::${med}::`,
-      ];
-      if (![...maybeValidTuples].some(k => allowedTupleSet.has(k))) return;
-
-      const qty = Number(r.quantity || 0);
-      byMed.set(med, (byMed.get(med) || 0) + qty);
-    });
-
-    if (byMed.size === 0) {
-      return {
-        highest: `No data for ${MONTHS[monthIdx]} last year in "${classification}".`,
-        lowest: "—",
-        actionable: "Record distributions first, then revisit this panel.",
-      };
-    }
-
-    const sorted = Array.from(byMed.entries()).sort((a,b) => b[1] - a[1]);
-
-    const [hiMed, hiVal] = sorted[0];
-    const lowEntry = sorted.length > 1 ? sorted[sorted.length - 1] : sorted[0];
-    const [loMed, loVal] = lowEntry;
-
-    const bufHi = Math.ceil((hiVal || 0) * 1.05);
-    const bufLo = Math.ceil((loVal || 0) * 1.05);
-
+  // Seasonal Demand Analysis with smarter "last year" fallback:
+// Order of precedence:
+// 1) Same month last year
+// 2) Latest month (<= current month) in last year that has data
+// 3) Same month this year
+// 4) Same month, most recent year that has data
+const seasonalWidget = useMemo(() => {
+  if (!classification) {
     return {
-      highest: `Highest this month: <b>${MONTHS[monthIdx]}</b> (${bufHi} units for ${hiMed})`,
-      lowest:  `Lowest this month: <b>${MONTHS[monthIdx]}</b> (${bufLo} units for ${loMed})`,
-      actionable: `Use a +5% buffer on last year’s ${MONTHS[monthIdx]} demand for each item. Prioritize fast movers in "${classification}".`,
+      highest: "Pick a classification to see high/low for this month.",
+      lowest: "—",
+      actionable:
+        "Select a classification above. We’ll show the top & bottom medicine (across forms) with a +5% buffer.",
     };
-  }, [tx, classification, currentYear, currentMonth, allowedTupleSet]);
+  }
+
+  const monthIdx = currentMonth;     // 0..11 (Nov = 10)
+  const lastYear = currentYear - 1;
+  const clsSelLC = classification.trim().toLowerCase();
+
+  // helpers
+  const makeKey = (name) => name?.trim().toLowerCase() || "";
+
+  // build per-medicine totals for a given year + monthIdx (one month)
+  const buildForYearMonth = (yr, mIdx) => {
+    const map = new Map(); // k -> { name, qty }
+    tx.forEach((r) => {
+      if (r.direction !== "out") return;
+      if ((r.classification || "").trim().toLowerCase() !== clsSelLC) return;
+      if (toYear(r.created_at) !== yr || toMonthIdx(r.created_at) !== mIdx) return;
+
+      const medRaw = (r.medicine_name || "").trim();
+      if (!medRaw) return;
+
+      const k = makeKey(medRaw);
+      const prev = map.get(k);
+      const qty  = (prev?.qty || 0) + Number(r.quantity || 0);
+      map.set(k, { name: prev?.name || medRaw, qty });
+    });
+    return map;
+  };
+
+  // find latest month in a year (<= current month) that has any data
+  const findLatestMonthWithDataInYear = (yr) => {
+    let latest = null;
+    tx.forEach((r) => {
+      if (r.direction !== "out") return;
+      if ((r.classification || "").trim().toLowerCase() !== clsSelLC) return;
+      const y = toYear(r.created_at);
+      const m = toMonthIdx(r.created_at);
+      if (y === yr && m <= monthIdx) {
+        if (latest === null || m > latest) latest = m;
+      }
+    });
+    return latest;
+  };
+
+  // Try 1) same month last year
+  let usedYear = lastYear;
+  let usedMonth = monthIdx;
+  let totalsByMed = buildForYearMonth(usedYear, usedMonth);
+
+  // Try 2) latest month in last year (<= current month)
+  if (totalsByMed.size === 0) {
+    const latestM = findLatestMonthWithDataInYear(lastYear);
+    if (latestM !== null) {
+      usedYear = lastYear;
+      usedMonth = latestM;
+      totalsByMed = buildForYearMonth(usedYear, usedMonth);
+    }
+  }
+
+  // Try 3) same month this year (useful for your 2025-11 sandbox data)
+  if (totalsByMed.size === 0) {
+    usedYear = currentYear;
+    usedMonth = monthIdx;
+    totalsByMed = buildForYearMonth(usedYear, usedMonth);
+  }
+
+  // Try 4) same month, most recent year with any data
+  if (totalsByMed.size === 0) {
+    let latestYear = null;
+    tx.forEach((r) => {
+      if (r.direction !== "out") return;
+      if ((r.classification || "").trim().toLowerCase() !== clsSelLC) return;
+      if (toMonthIdx(r.created_at) !== monthIdx) return;
+      const y = toYear(r.created_at);
+      if (latestYear == null || y > latestYear) latestYear = y;
+    });
+    if (latestYear != null) {
+      usedYear = latestYear;
+      usedMonth = monthIdx;
+      totalsByMed = buildForYearMonth(usedYear, usedMonth);
+    }
+  }
+
+  if (totalsByMed.size === 0) {
+    return {
+      highest: `No data for ${MONTHS[monthIdx]} in "${classification}".`,
+      lowest: "—",
+      actionable: "Record distributions first, then revisit this panel.",
+    };
+  }
+
+  const ranked = Array.from(totalsByMed.values()).sort((a, b) => b.qty - a.qty);
+  const hi = ranked[0];
+  const lo = ranked[ranked.length - 1];
+
+  const bufHi = Math.ceil(hi.qty * 1.05);
+  const bufLo = Math.ceil(lo.qty * 1.05);
+
+  // period note clarifies exactly what month/year was used
+  const baseNote =
+    usedYear === lastYear && usedMonth === monthIdx
+      ? `${MONTHS[usedMonth]} ${usedYear}`
+      : usedYear === lastYear
+      ? `Using ${MONTHS[usedMonth]} ${usedYear} (no ${MONTHS[monthIdx]} ${lastYear})`
+      : `Using ${MONTHS[usedMonth]} ${usedYear} (no ${MONTHS[monthIdx]} ${lastYear})`;
+
+  return {
+    highest: `Highest in <b>${baseNote}</b>: <b>${hi.name}</b> — ${hi.qty} units (+5% buffer = ${bufHi}).`,
+    lowest:  `Lowest in <b>${baseNote}</b>: <b>${lo.name}</b> — ${lo.qty} units (+5% buffer = ${bufLo}).`,
+    actionable: `Plan ${MONTHS[monthIdx]} stock for "${classification}" using ${baseNote} totals with a +5% buffer.`,
+  };
+}, [tx, classification, currentYear, currentMonth]);
 
   // Additional spike analysis across months
   const monthlySpikeMsg = useMemo(() => {

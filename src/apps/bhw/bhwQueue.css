@@ -1,27 +1,174 @@
-.queue-header{
-  display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;
+/* === Layout and Color Palette === */
+:root {
+  --header-h: 64px;
+  --sidebar-w: 240px; /* Adjust sidebar width */
+  --orange: #e9772e;  /* Brand Color - Orange */
+  --dark-blue: #0d3554; /* Dark Blue */
+  --muted-gray: #6b7280;
+  --bg-light: #f7f9fb; /* Light background */
+  --white: #ffffff;
+  --border: #e5e5e5; /* Light Gray border */
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --btn-hover: #f3f4f6; /* Light hover color */
 }
-.queue-count-badge{
-  display:flex; align-items:center; gap:10px;
-  border:1px solid var(--border, #d8d8d8);
-  background:#fff; padding:6px 10px; border-radius:8px;
-}
-.queue-count-badge .label{ font-size:12px; color:#555; letter-spacing:.2px; }
-.queue-count-badge .count{ font-weight:700; font-size:16px; min-width:28px; text-align:center; }
 
-.queue-list{ display:grid; gap:10px; }
-.queue-card{ display:flex; align-items:center; justify-content:space-between; border:1px solid #ddd; border-radius:8px; padding:10px 12px; background:#fff; }
-.queue-card__name{ font-weight:600; }
-.queue-card__meta{ margin-top:2px; }
-
-.kv{ display:grid; gap:6px; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); }
-.kv span{ color:#555; }
-.kv-col{ display:grid; gap:4px; }
-.well{ border:1px solid #ddd; background:#fafafa; border-radius:6px; padding:8px 10px; white-space:pre-wrap; }
-/* src/apps/bhw/BhwQueue.css */
-.page-title-row{
-  display:flex; align-items:center; justify-content:space-between;
+/* === Queueing Table Header === */
+.queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
 }
-.queue-count{
-  font-weight:600; font-size:14px;
+
+.queue-count-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  background: var(--white);
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.queue-count-badge .label {
+  font-size: 12px;
+  color: var(--muted-gray);
+  letter-spacing: 0.2px;
+}
+
+.queue-count-badge .count {
+  font-weight: 700;
+  font-size: 16px;
+  min-width: 28px;
+  text-align: center;
+  color: var(--dark-blue);
+}
+
+/* === Queue List === */
+.queue-list {
+  display: grid;
+  gap: 10px;
+}
+
+.queue-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--white);
+  box-shadow: var(--shadow);
+}
+
+.queue-card__name {
+  font-weight: 600;
+  color: var(--dark-blue);
+}
+
+.queue-card__meta {
+  margin-top: 2px;
+  color: var(--muted-gray);
+}
+
+/* === Queue Card Buttons === */
+.btn {
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease, opacity 0.12s ease;
+}
+
+.btn--primary {
+  background: var(--orange);
+  color: var(--white);
+  border: 1px solid transparent;
+}
+
+.btn--primary:hover {
+  background: #f3b184; /* Lighter orange on hover */
+}
+
+.btn--outline {
+  background: var(--white);
+  color: var(--dark-blue);
+  border: 1px solid var(--dark-blue);
+}
+
+.btn--outline:hover {
+  background: var(--btn-hover);
+}
+
+/* === Banner Notification === */
+.banner {
+  padding: 8px 16px;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+
+.banner--ok {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  color: #1b5e20;
+}
+
+.banner--err {
+  background: #fdecea;
+  border-color: #f5c6cb;
+  color: #8a1f11;
+}
+
+/* === Layout Helper for Well Card === */
+.well {
+  border: 1px solid #ddd;
+  background: #fafafa;
+  border-radius: 6px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+}
+
+.kv {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.kv span {
+  color: var(--muted-gray);
+}
+
+.kv-col {
+  display: grid;
+  gap: 4px;
+}
+
+/* === Responsiveness for Smaller Screens === */
+@media (max-width: 920px) {
+  .app.app--bhw {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    grid-column: 1;
+    grid-row: 2;
+    width: auto;
+  }
+  .main {
+    grid-column: 1;
+  }
+  .row--two {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* === Other Layout Tweaks === */
+.page-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.queue-count {
+  font-weight: 600;
+  font-size: 14px;
 }

@@ -1,167 +1,246 @@
 /* === Layout: header + sidebar + main side-by-side === */
-:root{
+:root {
   --header-h: 64px;
   --sidebar-w: 240px; /* tweak to your taste */
+  --orange: #e9772e;  /* Brand Color - Orange */
+  --dark-blue: #0d3554; /* Dark Blue */
+  --muted-gray: #6b7280;
+  --bg-light: #f7f9fb; /* light background */
+  --white: #ffffff;
+  --border: #e5e5e5; /* Gray border */
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --btn-hover: #f3f4f6; /* Light hover color */
 }
 
 /* Turn the whole page into a 2-row, 2-column grid:
    Row 1 = header spans both columns
    Row 2 = sidebar (col 1) + main (col 2) */
-.app.app--bhw{
+.app.app--bhw {
   display: grid;
   grid-template-rows: var(--header-h) 1fr;
   grid-template-columns: var(--sidebar-w) 1fr;
   min-height: 100vh;
-  /* prevent horizontal scroll but allow inner panes to scroll */
-  overflow-x: hidden;  /* changed from overflow: hidden */
+  overflow-x: hidden;  /* Allow inner panes to scroll */
 }
 
 /* Header stays on top; use sticky so no manual padding needed */
-.app--bhw .app-header{
+.app--bhw .app-header {
   grid-column: 1 / -1;
-  position: sticky; /* or fixed if you prefer */
+  position: sticky;
   top: 0;
   height: var(--header-h);
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  background: #fff; /* ensure it covers content when sticky */
-  border-bottom: 1px solid #e5e5e5;
+  padding: 0 6px;
+  font-size: 20px;
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--orange);
+  color: var(--white); /* White text in header */
+  border-bottom: 1px solid var(--border);
 }
 
 /* Sidebar sits left, scrolls independently */
-.app--bhw .sidebar{
+.app--bhw .sidebar {
   grid-row: 2;
   grid-column: 1;
   width: var(--sidebar-w);
   overflow: auto;
-  border-right: 1px solid #e5e5e5;
+  border-right: 1px solid var(--border);
   padding: 12px 10px;
-  background: #0d3554; /* use your theme color or remove */
-  color: #fff;
-  min-height: 0; /* allow grid child to shrink for proper scrolling */
+  background: var(--dark-blue); /* Dark Blue for sidebar */
+  color: var(--white);
+  min-height: 0;
 }
 
 /* Main content sits right of the sidebar */
-.app--bhw .main{
+.app--bhw .main {
   grid-row: 2;
   grid-column: 2;
   padding: 16px;
-  background: #f7f9fb; /* optional */
-  min-height: 0;        /* allow grid child to shrink inside the grid */
-  overflow: auto;       /* independent scroll */
+  background: var(--bg-light); /* Light background for main content */
+  min-height: 0;
+  overflow: auto;
 }
 
-/* Optional: make the sidebar nav look decent */
-.sidebar-nav{
+/* Sidebar Navigation */
+.sidebar-nav {
   display: grid;
   gap: 8px;
 }
-.tab-btn{
+
+.tab-btn {
   width: 100%;
   text-align: left;
   padding: 10px 12px;
   border-radius: 6px;
   border: 1px solid transparent;
-  background: rgba(255,255,255,0.08);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--white);
   cursor: pointer;
-}
-.tab-btn--active{
-  background: #fff;
-  color: #0d3554;
+  transition: background 0.15s ease;
 }
 
-/* Cards and fields (from earlier) — keep yours; included here for completeness */
-.card {
-  background: #fff;
-  border: 1px solid #d8d8d8;
+.tab-btn--active {
+  background: var(--white);
+  color: var(--dark-blue);
+}
+
+/* Queuing Table Card Styles */
+.queue-card {
+  background: var(--white);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-}
-.card__header { display: flex; align-items: center; margin-bottom: 8px; }
-.card__title { font-weight: 600; font-size: 14px; }
-.subsection { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #d8d8d8; }
-.subsection__title { font-weight: 600; font-size: 13px; margin-bottom: 8px; }
-
-.row { display: grid; gap: 10px; margin-bottom: 10px; }
-.row--two { grid-template-columns: 1fr 1fr; }
-
-@media (max-width: 920px){
-  .app.app--bhw{ grid-template-columns: 1fr; }
-  .sidebar{ grid-column:1; grid-row:2; width:auto; }
-  .main{ grid-column:1; }
-  .row--two{ grid-template-columns:1fr; }
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.stack { display: grid; gap: 8px; }
-.field { display: flex; flex-direction: column; gap: 4px; }
-.label { font-size: 12px; color: #333; }
-.input, .select-input, .textarea {
-  width: 100%; border: 1px solid #bdbdbd; border-radius: 6px; padding: 8px 10px; font-size: 14px; background: #fff;
+.queue-card__left {
+  flex-grow: 1;
 }
-.input.is-disabled { background: #f4f4f4; }
-.input.has-error, .textarea.has-error { border-color: #d93025; }
-.textarea--complaint { min-height: 110px; resize: vertical; }
 
-.hint { font-size: 12px; color: #666; margin: 4px 0 8px; }
-.hint--lock .hint-strong { font-weight: 600; }
-.error-text { font-size: 12px; color: #d93025; margin-top: 4px; }
-.required-asterisk { color: #d93025; }
+.queue-card__name {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--dark-blue);
+}
 
-.select { position: relative; }
-.select-input { appearance: none; }
-.select-caret { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.queue-card__meta {
+  font-size: 12px;
+  color: var(--muted-gray);
+}
 
-.note { margin-top: 12px; padding: 10px; border-radius: 6px; border: 1px solid transparent; }
-.note--success { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
-.note--error { background: #fdecea; border-color: #f5c6cb; color: #8a1f11; }
-.note--info { background: #eef6ff; border-color: #cfe0ff; color: #0b4aa2; }
-.note--compact { padding: 6px 8px; }
+.queue-card__right {
+  display: flex;
+  gap: 8px;
+}
 
-.form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0 6px; }
-.btn { padding: 10px 12px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; }
-.btn--primary { background: #e9f7ee; border-color: #9ad4a7; }
-.btn--primary:disabled { opacity: 0.6; cursor: default; }
-.btn--ghost { background: #fff; border-color: #ef9a9a; color: #b71c1c; }
-
-/* Helpful stubs */
-.alert--error { background:#fdecea; border:1px solid #f5c6cb; color:#8a1f11; padding:8px 10px; border-radius:6px; }
-.input--search { max-width: 320px; }
-.family-list { display:grid; gap:8px; margin-top:12px; }
-.family-list__item { padding:10px; border:1px solid #ddd; border-radius:6px; text-decoration:none; color:#222; }
-
-/* --- Added small quality-of-life tweaks --- */
-
-/* Keep header above all content (already sticky), add subtle elevation */
-.app--bhw .app-header { box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
-
-/* Center the patient registration form on wide screens */
-.form--patient-registration { max-width: 1000px; margin: 0 auto; }
-
-/* Prevent scroll chaining/bounce inside panels (optional) */
-.app--bhw .sidebar,
-.app--bhw .main { overscroll-behavior: contain; }
-/* keep header above everything */
-.app--bhw .app-header { z-index: 200; }
-
-/* visible, high-contrast logout button */
-.btn--link {
-  background: transparent;
-  border: 1px solid #0d3554;
-  color: #0d3554;
+.btn {
   padding: 8px 12px;
-  font-weight: 600;
-  border-radius: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease, opacity 0.12s ease;
 }
-.btn--link:hover {
-  background: #0d3554;
-  color: #fff;
+
+.btn--primary {
+  background: var(--orange);
+  color: var(--white);
+  border: 1px solid transparent;
 }
-.btn--logout {
-  /* ensure it never collapses or hides on narrow screens */
-  white-space: nowrap;
+
+.btn--primary:hover {
+  background: #f3b184; /* Light orange on hover */
 }
+
+.btn--outline {
+  background: var(--white);
+  color: var(--dark-blue);
+  border: 1px solid var(--dark-blue);
+}
+
+.btn--outline:hover {
+  background: var(--btn-hover);
+}
+
+/* Patient Registration Form Styles */
+.form--patient-registration {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.input, .select-input, .textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #bdbdbd;
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--white);
+}
+
+.input.is-disabled {
+  background: #f4f4f4;
+}
+
+.input.has-error, .textarea.has-error {
+  border-color: #d93025;
+}
+
+.textarea--complaint {
+  min-height: 110px;
+  resize: vertical;
+}
+
+/* Banner Notification Styles */
+.banner {
+  padding: 8px 16px;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+
+.banner--ok {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  color: #1b5e20;
+}
+
+.banner--err {
+  background: #fdecea;
+  border-color: #f5c6cb;
+  color: #8a1f11;
+}
+
+/* Helper classes for layout */
+.error-text {
+  font-size: 12px;
+  color: #d93025;
+  margin-top: 4px;
+}
+
+/* Grid layout for forms */
+.row {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.row--two {
+  grid-template-columns: 1fr 1fr;
+}
+
+.select-input {
+  appearance: none;
+}
+
+.select-caret {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.required-asterisk {
+  color: #d93025;
+}
+
+/* Responsive Styles for smaller screens */
+@media (max-width: 920px) {
+  .app.app--bhw {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    grid-column: 1;
+    grid-row: 2;
+    width: auto;
+  }
+  .main {
+    grid-column: 1;
+  }
+  .row--two {
+    grid-template-columns: 1fr;
+  }
+}
+

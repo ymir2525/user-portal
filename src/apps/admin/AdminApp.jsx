@@ -14,14 +14,24 @@ import AdminChartView from "./AdminChartView";
 import AdminFamily from "./AdminFamily"; // <-- NEW
 import NurseQueueChartView from "../nurse/NurseQueueChartView"; // <-- reuse read-only chart
 
+// Original palette (kept, still used for the top header + page bg)
 const ORANGE   = "#e9772e";
 const PEACH    = "#f3b184";
 const PEACH_BG = "#fde6d3";
 const PANEL_BG = "#fff7f1";
 
+// Sidebar palette to match your screenshot
+const NAVY      = "#0A2647";  // deep navy
+const NAVY_DARK = "#06213d";
+const ORANGE2   = "#E85D24";  // vivid orange accents
+
 export default function AdminApp() {
   const [toast, setToast] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // NEW: sidebar collapse
+  const [collapsed, setCollapsed] = useState(false);
+  const sidebarWidth = collapsed ? 64 : 256; // px
 
   const flash = (msg, type = "info", ms = 3500) => {
     setToast({ msg, type });
@@ -43,11 +53,14 @@ export default function AdminApp() {
     loc.pathname.startsWith("/admin/day-history") ||
     loc.pathname.startsWith("/admin/record/");
 
+  // util: class for sidebar links
+  const linkClass = ({ isActive }) => `link ${isActive ? "active" : ""}`;
+
   return (
     <div className="flex flex-col h-screen" style={{ backgroundColor: PEACH_BG }}>
       <header className="w-full px-6 py-3 text-white shrink-0" style={{ backgroundColor: ORANGE }}>
         <div className="flex items-center justify-between">
-          <div className="font-semibold">Caybiga Health Center — Admin</div>
+          <div className="font-semibold">Phase 8 Bagong Silang Health Center — Admin</div>
 
           <button
             onClick={handleLogout}
@@ -64,109 +77,105 @@ export default function AdminApp() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      {/* Local styles just for the sidebar look/feel and the toggle */}
+      <style>{`
+        .sb { --navy:${NAVY}; --navyDark:${NAVY_DARK}; --orange:${ORANGE2}; }
+        .sb h2.title { color:#fff; letter-spacing:.3px; }
+        .sb .link {
+          display:block; width:100%;
+          background:#fff; color:#0f172a;
+          border:2px solid var(--orange);
+          border-radius:8px;
+          padding:.48rem .6rem;
+          font-weight:700; font-size:.88rem;
+          transition:transform .12s ease, box-shadow .12s ease, background .12s ease, color .12s ease, border-color .12s ease;
+          box-shadow:0 1px 0 rgba(0,0,0,.05);
+          text-decoration:none;
+        }
+        .sb .link:hover{
+          transform:translateY(-1px);
+          box-shadow:0 4px 12px rgba(0,0,0,.08);
+        }
+        .sb .link.active{
+          background:var(--orange);
+          color:#fff;
+          border-color:var(--orange);
+        }
+        .sb .nav-wrap { gap:.5rem; display:flex; flex-direction:column; }
+        .sb .divider { position:absolute; right:0; top:0; bottom:0; width:3px; background:var(--orange); }
+        .sb .collapse-label { color:#dbeafe; font-size:.75rem; opacity:.85; }
+        .sb .toggle {
+          position:absolute; top:72px;
+          width:44px; height:44px; border-radius:9999px;
+          background:#fff;
+          border:5px solid var(--navy);
+          display:flex; align-items:center; justify-content:center;
+          box-shadow:0 6px 14px rgba(0,0,0,.18);
+          cursor:pointer;
+          z-index:30;
+        }
+        .sb .toggle:active { transform:scale(.98); }
+      `}</style>
+
+      {/* Relative container so we can place the round toggle exactly at the edge */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Sidebar */}
         <aside
-          className="self-stretch w-64 h-full p-4 overflow-y-auto border-r"
-          style={{ backgroundColor: PANEL_BG, borderColor: PEACH }}
+          className="sb h-full p-4 overflow-y-auto"
+          style={{
+            width: sidebarWidth,
+            backgroundColor: NAVY,
+            borderRight: `1px solid ${NAVY_DARK}`,
+            transition: "width .18s ease"
+          }}
         >
-          <h2 className="mb-4 font-semibold" style={{ color: ORANGE }}>
-            Admin Dashboard
+          <h2 className="mb-4 font-semibold title">
+            {collapsed ? "Admin" : "Admin Dashboard"}
           </h2>
 
-          <nav className="space-y-2">
-            <NavLink
-              to="/admin/dashboard"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
-            >
-              Dashboard
+          {/* Links */}
+          <nav className="nav-wrap">
+            <NavLink to="/admin/dashboard" className={linkClass}>
+              {collapsed ? "• Dashboard" : "Dashboard"}
             </NavLink>
 
-            <NavLink
-              to="/admin/queue"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
-            >
-              Queuing Table
+            <NavLink to="/admin/queue" className={linkClass}>
+              {collapsed ? "• Queue" : "Queuing Table"}
             </NavLink>
 
-            <NavLink
-              to="/admin/records"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
-            >
-              Patient Records
+            <NavLink to="/admin/records" className={linkClass}>
+              {collapsed ? "• Records" : "Patient Records"}
             </NavLink>
 
-            <NavLink
-              to="/admin/inventory"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
-            >
-              Medicine Inventory
+            <NavLink to="/admin/inventory" className={linkClass}>
+              {collapsed ? "• Inventory" : "Medicine Inventory"}
             </NavLink>
 
-            {/* Day History tab (active for /admin/day-history AND /admin/record/...) */}
-            <Link
-              to="/admin/day-history"
-              className={`w-full block px-3 py-2 border rounded-lg ${isDayHistoryContext ? "text-white" : "text-gray-800"}`}
-              style={{
-                backgroundColor: isDayHistoryContext ? ORANGE : "#ffffff",
-                borderColor: isDayHistoryContext ? ORANGE : PEACH,
-              }}
-            >
-              Day History
+            {/* Day History tab (custom active state) */}
+            <Link to="/admin/day-history" className={`link ${isDayHistoryContext ? "active" : ""}`}>
+              {collapsed ? "• Day Hist." : "Day History"}
             </Link>
 
-            <NavLink
-              to="/admin/analytics"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
-            >
-              Data Analytics
+            <NavLink to="/admin/analytics" className={linkClass}>
+              {collapsed ? "• Analytics" : "Data Analytics"}
             </NavLink>
 
-            <NavLink
-              to="/admin/accounts"
-              className={({isActive}) =>
-                `w-full block px-3 py-2 border rounded-lg ${isActive ? "text-white" : "text-gray-800"}`
-              }
-              style={({isActive}) => ({
-                backgroundColor: isActive ? ORANGE : "#ffffff",
-                borderColor: isActive ? ORANGE : PEACH,
-              })}
-            >
-              Account Management
+            <NavLink to="/admin/accounts" className={linkClass}>
+              {collapsed ? "• Accounts" : "Account Management"}
             </NavLink>
+
+          
           </nav>
+
+          {/* Orange divider at the right edge (visual) */}
+          <div className="divider" />
         </aside>
 
-        <main className="flex-1 p-6 overflow-y-auto">
+       
+        
+
+        {/* Main content */}
+        <main className="flex-1 p-6 overflow-y-auto" style={{ background: PANEL_BG }}>
           <Routes>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<AdminDashboard />} />
@@ -180,10 +189,8 @@ export default function AdminApp() {
             <Route path="archive" element={<Navigate to="/admin/day-history" replace />} />
             <Route path="analytics" element={<DataAnalytics />} />
             <Route path="accounts" element={<AccountManagement flash={flash} />} />
-
             {/* NEW: read-only chart view by recordId (same as Nurse) */}
             <Route path="record/:recordId" element={<NurseQueueChartView />} />
-
             <Route path="*" element={<div>Admin Page Not Found</div>} />
           </Routes>
 

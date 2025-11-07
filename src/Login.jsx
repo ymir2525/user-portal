@@ -1,6 +1,7 @@
 // src/Login.jsx
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import Logo from "./assets/Logo.png";
 import { supabase } from "./lib/supabase";
 
 const roleToPath = (r) =>
@@ -186,14 +187,14 @@ export default function Login({ embed = false, title = "User Login" }) {
       {/* Banner */}
       <div className="max-w-5xl mx-auto px-4 pt-10 pb-8">
         <div className="bg-[#e9772e] rounded-[48px] text-white px-6 py-6 flex items-center gap-4 shadow-lg">
-          <div className="w-16 h-16 rounded-full bg-white/90 shrink-0 grid place-items-center overflow-hidden">
+          
             <img
-              src="/assets/seal.png"
+              src={Logo}
               alt="Health Center Seal"
-              className="w-full h-full object-cover"
+              className="object-cover above-curve w-16 h-16 rounded-full bg-white/90 "
               onError={(e) => { e.currentTarget.style.display = "none"; }}
             />
-          </div>
+     
           <div className="flex-1">
             <div className="text-xl sm:text-2xl font-semibold">
               Bagong Silang Phase&nbsp;8 Health Center
@@ -227,9 +228,7 @@ export default function Login({ embed = false, title = "User Login" }) {
                 Patient Record Management Accessibility
               </div>
               <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
-                nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+              Your essential documents deserve more than a chaotic folder structure. Our Record Management System is the digital engine for compliance and efficiency. It automates retention, ensures security, and provides instant, auditable access to every single file. Stop managing records; let the system manage them for you. Get back to work, not back to searching.
               </p>
             </div>
           </div>
@@ -241,9 +240,7 @@ export default function Login({ embed = false, title = "User Login" }) {
                 Medicine Inventory Easy Manageability
               </div>
               <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
-                incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
-                nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+                Stop treating your stock like guesswork. Our Inventory Management System provides real-time, intelligent control over your entire supply chain. It connects logistics, forecasts demand using actual data, and optimizes stock levels across all locations.
               </p>
             </div>
           </div>

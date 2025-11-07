@@ -2,8 +2,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import "./doctorDash.css";
 
+/* ---------------- Doctor Patients ---------------- */
 export default function DoctorPatients() {
   const nav = useNavigate();
   const [q, setQ] = useState("");
@@ -50,12 +50,12 @@ export default function DoctorPatients() {
       const like = q.trim();
       let query = supabase
         .from("patients")
-        .select("family_number,surname")
+        .select("family_number,surname,address") // Include address in query from the 'patients' table
         .order("family_number", { ascending: sortAsc });
 
       if (like) {
         query = query.or(
-          `family_number.ilike.%${like}%,surname.ilike.%${like}%`
+          `family_number.ilike.%${like}%,surname.ilike.%${like}%,address.ilike.%${like}%`
         );
       }
 
@@ -78,59 +78,66 @@ export default function DoctorPatients() {
   }
 
   return (
-    <section className="section section--records">
-      <h2 className="section-title">Patient Records</h2>
+    <section className="p-6">
+      <h2 className="text-2xl font-bold mb-4">Patient Records</h2>
 
-      <div className="toolbar" style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 8 }}>
-        <input
-          className="input input--search"
-          placeholder="Search by Family No. or Surname..."
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          autoComplete="off"
-        />
-        <div className="btn-group">
+      {/* Toolbar */}
+      <div className="flex justify-between gap-4 mb-4">
+        {/* Search and Sort */}
+        <div className="flex gap-4 items-center flex-1">
+          <input
+            type="text"
+            className="p-2 border rounded-md w-1/3"
+            placeholder="Search by Family No. or Surname"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
           <button
-            className={`btn ${sortAsc ? "btn--primary" : "btn--secondary"}`}
+            className={`btn btn-sm ${sortAsc ? "bg-blue-100" : "bg-gray-200"}`}
             onClick={() => setSortAsc(true)}
-            title="Ascending"
           >
             ↑ Ascending
           </button>
           <button
-            className={`btn ${!sortAsc ? "btn--primary" : "btn--secondary"}`}
+            className={`btn btn-sm ${!sortAsc ? "bg-blue-100" : "bg-gray-200"}`}
             onClick={() => setSortAsc(false)}
-            title="Descending"
           >
             ↓ Descending
           </button>
         </div>
+
+        {/* Refresh Button */}
         <button
-          className="btn btn--secondary"
-          onClick={() => void load()}
+          className="btn btn-sm bg-blue-500 text-white"
+          onClick={load}
           disabled={loading}
         >
           {loading ? "Loading..." : "Refresh"}
         </button>
-        {/* doctor view: no Add Patient */}
-        <div />
       </div>
 
-      {err && <div className="alert alert--error">{err}</div>}
+      {/* Error Handling */}
+      {err && <div className="text-red-600">{err}</div>}
 
-      <div className="family-list">
+      {/* Patient List */}
+      <div className="space-y-4">
         {items.map((row) => (
           <Link
             key={`${row.family_number}-${row.surname}`}
             to={`/doctor/family/${encodeURIComponent(row.family_number)}`}
-            className="family-list__item"
+            className="block p-4 bg-white border rounded-md hover:bg-gray-100"
           >
-            {row.family_number} - {row.surname}
+            <div className="font-semibold">
+              FAM {String(row.family_number).padStart(3, "0")} - {row.surname}
+            </div>
+            <div className="text-gray-600 text-sm mt-1">
+              {row.address && row.address.trim() ? row.address : "No address available"}
+            </div>
           </Link>
         ))}
 
         {items.length === 0 && !loading && (
-          <div className="empty">No families found.</div>
+          <div className="text-center text-gray-500">No families found.</div>
         )}
       </div>
     </section>

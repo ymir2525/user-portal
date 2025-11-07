@@ -47,7 +47,7 @@ export default function BhwDashboard() {
   return (
     <div className="app app--bhw">
       <header className="app-header">
-        <div className="brand">Caybiga Health Center</div>
+        <div className="brand">Phase 8 Health Center</div>
         <button onClick={logout} className="btn btn--link btn--logout">Log Out</button>
       </header>
 

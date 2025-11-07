@@ -1,11 +1,19 @@
 // src/routes/RequireAuth.jsx
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
+// Any path here is allowed without auth
+const PUBLIC_PATHS = new Set([
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+]);
+
 export default function RequireAuth({ children }) {
-  const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState(null);
+  const location = useLocation();
+  const [session, setSession] = useState(undefined); // undefined = loading; null = no session
 
   useEffect(() => {
     let mounted = true;
@@ -13,20 +21,18 @@ export default function RequireAuth({ children }) {
     // Initial check
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      setSession(data.session);
-      setLoading(false);
+      setSession(data.session ?? null);
     });
 
-    // Keep watching: if session becomes null (logout/expire), hard redirect
+    // Watch for auth changes; if it becomes null, hard redirect to avoid BFCache/history weirdness
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, sess) => {
-      setSession(sess);
-      if (!sess) {
-        // Replace current history entry so Forward can't re-enter
-        window.location.replace("/login");
+      setSession(sess ?? null);
+      if (!sess && !PUBLIC_PATHS.has(window.location.pathname)) {
+        window.location.replace("/login"); // replace history so user can't go "back" into a protected route
       }
     });
 
-    // Bust BFCache: if page is restored from back/forward cache, reload to re-check session
+    // If browser restores from BFCache, force a re-check
     const onPageShow = (e) => { if (e.persisted) window.location.reload(); };
     window.addEventListener("pageshow", onPageShow);
 
@@ -37,8 +43,19 @@ export default function RequireAuth({ children }) {
     };
   }, []);
 
-  if (loading) return null;
-  if (!session) return <Navigate to="/login" replace />;
+  // While checking session, render nothing (or a spinner)
+  if (session === undefined) return null;
 
+  // Public pages are always accessible
+  if (PUBLIC_PATHS.has(location.pathname)) {
+    return children;
+  }
+
+  // No session? Send to login and remember intended destination
+  if (!session) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  // Authenticated—allow protected content
   return children;
 }
