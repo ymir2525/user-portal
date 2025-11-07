@@ -12,7 +12,7 @@ import PastRecordDetail from "../../components/past/PastRecordDetail";
 import PastDocumentsView from "../../components/past/PastDocumentsView";
 import MedCertForm from "../../components/MedCertForm";
 import LabRequestForm from "../../components/LabRequestForm";
-import PrescriptionForm from "../../components/PrescriptionForm";
+import PrescriptionForm, { formatPrescribedItemsAsText } from "../../components/PrescriptionForm"; // <-- IMPORT FIX
 import "../doctor/doctorDash.css";
 
 function ageDisplayFromBirthdate(birthdate, fallbackAge) {
@@ -75,7 +75,7 @@ export default function AdminChartView() {
     day: "2-digit",
   }).format(new Date());
 
- /* ---------- load record ---------- */
+  /* ---------- load record ---------- */
 const loadRecord = useCallback(async () => {
   try {
     setBanner(null);
@@ -147,7 +147,7 @@ const loadRecord = useCallback(async () => {
         sex: data.sex ?? "",
         age: data.age ?? "",
         birthdate: data.birthdate ?? null,
-         contact_number: data.contact_number ?? "",
+        contact_number: data.contact_number ?? "",
         contact_person_number: data.contact_person ?? "",
         contact_person_name: data.emergency_contact_name ?? "",
         relation: data.emergency_relation ?? "",
@@ -195,7 +195,7 @@ useEffect(() => {
   };
 }, [rec?.patient_id, loadRecord]);
 
-// (optional) Also refresh this view if someone bumps the record (e.g., BHW save sets updated_at)
+// (optional) Also refresh this view if someone bumps the record (e.g., updated_at bump)
 useEffect(() => {
   if (!rec?.record_id) return;
   const ch = supabase
@@ -500,6 +500,7 @@ useEffect(() => {
       <div className="stack">
         {banner && <div className={`banner ${banner.type === "ok" ? "banner--ok" : "banner--err"}`}>{banner.msg}</div>}
         <div className="muted small">Loading…</div>
+        {/* The back button for the loading state */}
         <button className="btn btn--outline" onClick={() => nav("/admin/queue")}>Back</button>
       </div>
     );
@@ -550,15 +551,36 @@ useEffect(() => {
     }
   }
 
+  // --- Handler to combine saving Prescription data with updating Management notes ---
+  const handlePrescriptionSave = async (payload) => {
+    // 1. Format the prescribed items into a text block
+    const prescribedText = formatPrescribedItemsAsText(payload.items);
+
+    // 2. Append the text block to docManagement
+    setDocManagement((prev) => {
+      const current = prev?.trim() || '';
+      const glue = current ? "\n\n" : "";
+      return `${current}${glue}${prescribedText}`;
+    });
+
+    // 3. Continue with the standard document saving/printing flow
+    await onSavePdf(payload);
+  };
+  // ----------------------------------------------------------------------------------
+
   return (
     <div className="stack pt-1">
       {banner && <div className={`banner ${banner.type === "ok" ? "banner--ok" : "banner--err"}`}>{banner.msg}</div>}
-      <button
-        onClick={() => nav("/admin/queue")}
-        style={{ color: "black", border: "1px solid black", padding: "4px", width: "140px" }}
-      >
-        back
-      </button>
+
+      {/* FIX: Conditional rendering for the Back button */}
+      {docView === "none" && (
+        <button
+          onClick={() => nav("/admin/queue")}
+          style={{ color: "black", border: "1px solid black", padding: "4px", width: "140px" }}
+        >
+          back
+        </button>
+      )}
 
       {/* ====== Main Day Chart ====== */}
       {docView === "none" && (
@@ -697,85 +719,7 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* Prescribed */}
-              <div className="card card--form" style={{ marginTop: 12 }}>
-                <h4 className="card__title">Medicine Prescribed</h4>
-                {rxRows.map((row, i) => (
-                  <div className="grid" key={`rx-${i}`} style={{ alignItems: "end" }}>
-                    <div className="field">
-                      <label className="label">Medicine Classification</label>
-                      <select
-                        className="input"
-                        value={row.classification}
-                        onChange={(e) => updateRxRow(i, { classification: e.target.value })}
-                      >
-                        <option value="">Select classification</option>
-                        {classifications.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="field">
-                      <label className="label">Medicine Name</label>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <select
-                          className="input"
-                          value={row.nameMode === "dropdown" ? row.name : ""}
-                          onChange={(e) => updateRxRow(i, { nameMode: "dropdown", name: e.target.value })}
-                          disabled={row.nameMode !== "dropdown"}
-                        >
-                          <option value="">{row.classification ? "Select medicine" : "Select classification first"}</option>
-                          {namesForClass(row.classification).map((n) => (
-                            <option key={n} value={n}>{n}</option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          className="btn btn--outline"
-                          onClick={() => updateRxRow(i, { nameMode: "manual", name: "" })}
-                        >
-                          Manual Input
-                        </button>
-                      </div>
-                      {row.nameMode === "manual" && (
-                        <input
-                          className="input mt-2"
-                          placeholder="Type medicine name"
-                          value={row.name}
-                          onChange={(e) => updateRxRow(i, { name: e.target.value })}
-                        />
-                      )}
-                    </div>
-
-                    <div className="field">
-                      <label className="label">Quantity</label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        className="input"
-                        value={row.qty}
-                        onChange={(e) => updateRxRow(i, { qty: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="field">
-                      {rxRows.length > 1 && (
-                        <button type="button" className="btn btn--outline" onClick={() => removeRxRow(i)}>
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                  <button type="button" className="btn btn--orange" onClick={addAllPrescribedToList}>
-                    Add to List
-                  </button>
-                </div>
-              </div>
+              
             </div>
           </div>
           {/* ====== END MEDICINE SECTION ====== */}
@@ -873,15 +817,8 @@ useEffect(() => {
         <PrescriptionForm
           active={rec}
           onBack={() => setDocView("none")}
-          onSavePdf={async (form) => {
-            try {
-              if (!window.confirm("Save this prescription and open Save as PDF?")) return;
-              const filename = `PRESCRIPTION_${rec.family_number}_${fullName(rec)}_${fmtDate(new Date()).replace(/\//g, "-")}.pdf`;
-              await supabase.from("record_documents").insert({ record_id: rec.record_id, type: "prescription", payload: form, filename });
-              setBanner({ type: "ok", msg: "Prescription saved. Choose 'Save as PDF' in the dialog." });
-              setTimeout(() => window.print(), 150);
-            } catch (e) { setBanner({ type: "err", msg: e.message || "Failed to save prescription" }); }
-          }}
+          // FIX: Use the custom handler to update docManagement
+          onSavePdf={handlePrescriptionSave}
         />
       )}
 

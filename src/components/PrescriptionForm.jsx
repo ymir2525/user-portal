@@ -4,6 +4,28 @@ import { fmtDate, fullName } from "../lib/utils";
 import SignatureDialog from "./signaturePad/SignatureDialog";
 import "./PrescriptionForm.css"; // ← external CSS (no Tailwind)
 
+// --- Exported helper to format prescription items for the Management field ---
+export function formatPrescribedItemsAsText(items) {
+  const cleaned = items
+    .map((r) => ({
+      name: String(r.name || "").trim(),
+      sig: String(r.sig || "").trim(),
+      qty: String(r.qty || "").trim(),
+    }))
+    .filter((r) => r.name || r.sig || r.qty);
+
+  if (cleaned.length === 0) return "";
+
+  const blocks = cleaned.map((r) => {
+    const qty = r.qty ? ` (Qty: ${r.qty})` : '';
+    const sig = r.sig ? `— Sig: ${r.sig}` : '';
+    return `${r.name}${qty}${sig}`;
+  });
+
+  return `Prescribed:\n- ${blocks.join("\n- ")}`;
+}
+// --------------------------------------------------------------------------
+
 export default function PrescriptionForm({ active, onBack, onSavePdf }) {
   // --- Date / Doctor / Items (free-text only) ---
   const [date] = useState(() => fmtDate(new Date())); // read-only now
@@ -49,6 +71,14 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
 
   const computeAge = () => ageDisplayFromBirthdate(active?.birthdate, active?.age);
 
+  const cleanedItems = items
+    .map((r) => ({
+      name: String(r.name || "").trim(),
+      sig: String(r.sig || "").trim(),
+      qty: String(r.qty || "").trim(),
+    }))
+    .filter((r) => r.name || r.sig || r.qty);
+
   const payload = {
     patient: {
       id: active?.patient_id,
@@ -60,13 +90,7 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
     doctor_name: doctorName,
     license_no: licenseNo,
     signature_png: doctorSignaturePng || "",
-    items: items
-      .map((r) => ({
-        name: String(r.name || "").trim(),
-        sig: String(r.sig || "").trim(),
-        qty: String(r.qty || "").trim(),
-      }))
-      .filter((r) => r.name || r.sig || r.qty),
+    items: cleanedItems,
   };
 
   // -------- Validation before saving/printing --------
@@ -76,12 +100,11 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
     if (!String(doctorName).trim()) missing.push("Physician");
     if (!String(licenseNo).trim()) missing.push("License No.");
 
-    const cleaned = payload.items;
-    if (cleaned.length === 0) {
+    if (cleanedItems.length === 0) {
       missing.push("At least one medicine row (Name, Directions, Quantity)");
     } else {
       const badRows = [];
-      cleaned.forEach((r, idx) => {
+      cleanedItems.forEach((r, idx) => {
         const problems = [];
         if (!r.name) problems.push("Name");
         if (!r.sig) problems.push("Directions");
@@ -108,6 +131,7 @@ export default function PrescriptionForm({ active, onBack, onSavePdf }) {
     if (e) e.preventDefault();
     if (!validateBeforeSave()) return;
 
+    // Pass the payload which contains the items
     onSavePdf(payload);
 
     // Guard against duplicate print dialogs (after cancel/save)
@@ -340,7 +364,7 @@ function RxPrintSheet({ payload }) {
     <div className="rx-print-sheet">
       <div className="rx-print-card">
         <div className="rx-print-head">
-          <div className="rx-print-clinic">Caybiga Health Center</div>
+          <div className="rx-print-clinic">Phase 8 Bagong Silang Health Center</div>
           <div className="rx-print-sub">PRESCRIPTION FORM</div>
         </div>
 
